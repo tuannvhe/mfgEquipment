@@ -138,8 +138,10 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   }
 
   // Row Management Helpers
-  const pRowCount = Math.max(4 + extraP, form.periodicItems?.length || 0)
-  const sRowCount = Math.max(4 + extraS, form.spareParts?.length || 0)
+  const commonExtra = Math.max(extraP, extraS)
+  const commonLength = Math.max(form.periodicItems?.length || 0, form.spareParts?.length || 0)
+  const pRowCount = Math.max(4 + commonExtra, commonLength)
+  const sRowCount = Math.max(4 + commonExtra, commonLength)
   const botRowCount = Math.max(4 + extraBot, form.inspections?.length || 0)
 
   const clearPRow = (i: number) => {
@@ -153,6 +155,12 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     if (newP.length > i) newP.splice(i, 1)
     set('periodicItems', newP)
     if (extraP > 0) setExtraP(p => p - 1)
+
+    // Also delete from spareParts
+    const newS = [...(form.spareParts || [])]
+    if (newS.length > i) newS.splice(i, 1)
+    set('spareParts', newS)
+    if (extraS > 0) setExtraS(s => s - 1)
   }
 
   const clearSRow = (i: number) => {
@@ -166,6 +174,12 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     if (newS.length > i) newS.splice(i, 1)
     set('spareParts', newS)
     if (extraS > 0) setExtraS(s => s - 1)
+
+    // Also delete from periodicItems
+    const newP = [...(form.periodicItems || [])]
+    if (newP.length > i) newP.splice(i, 1)
+    set('periodicItems', newP)
+    if (extraP > 0) setExtraP(p => p - 1)
   }
 
   const clearBotRow = (i: number) => {
@@ -530,7 +544,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                     onClick={() => { setExtraP(v => v + 1); setExtraS(v => v + 1); setExtraBot(v => v + 1) }}
                     className="w-full h-7 bg-slate-50 hover:bg-[#eef4ea] flex items-center justify-center text-[11px] font-bold text-slate-400 hover:text-[#2d5f1b] transition-colors"
                   >
-                    <Plus size={12} className="mr-1" /> Thêm dòng cho tất cả
+                    <Plus size={12} className="mr-1" /> Thêm dòng
                   </button>
                 </td>
               </tr>
