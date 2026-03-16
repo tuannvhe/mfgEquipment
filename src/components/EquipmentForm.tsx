@@ -436,16 +436,6 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                               </tr>
                             )
                           })}
-                          <tr className="no-print">
-                            <td colSpan={2} className="p-0 border-t border-black">
-                              <button
-                                onClick={() => { setExtraP(v => v + 1); setExtraBot(v => v + 1) }}
-                                className="w-full h-7 bg-slate-50 hover:bg-[#eef4ea] flex items-center justify-center text-[11px] font-bold text-slate-400 hover:text-[#2d5f1b] transition-colors"
-                              >
-                                <Plus size={12} className="mr-1" /> Thêm dòng
-                              </button>
-                            </td>
-                          </tr>
                         </tbody>
                       </table>
                     </div>
@@ -527,21 +517,21 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                               </tr>
                             )
                           })}
-                          <tr className="no-print">
-                            <td colSpan={4} className="p-0 border-t border-black">
-                              <button
-                                onClick={() => { setExtraS(v => v + 1); setExtraBot(v => v + 1) }}
-                                className="w-full h-7 bg-slate-50 hover:bg-[#eef4ea] flex items-center justify-center text-[11px] font-bold text-slate-400 hover:text-[#2d5f1b] transition-colors"
-                              >
-                                <Plus size={12} className="mr-1" /> Thêm dòng
-                              </button>
-                            </td>
-                          </tr>
                         </tbody>
                       </table>
                     </div>
 
                   </div>
+                </td>
+              </tr>
+              <tr className="no-print">
+                <td colSpan={8} className="border-t border-black p-0">
+                  <button
+                    onClick={() => { setExtraP(v => v + 1); setExtraS(v => v + 1); setExtraBot(v => v + 1) }}
+                    className="w-full h-7 bg-slate-50 hover:bg-[#eef4ea] flex items-center justify-center text-[11px] font-bold text-slate-400 hover:text-[#2d5f1b] transition-colors"
+                  >
+                    <Plus size={12} className="mr-1" /> Thêm dòng cho tất cả
+                  </button>
                 </td>
               </tr>
 
