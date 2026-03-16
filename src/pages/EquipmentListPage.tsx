@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Input, Select, Button, Space } from 'antd'
 import { Search, X, Settings2, CheckCircle2, AlertCircle, XCircle, Download } from 'lucide-react'
-import type { Equipment } from '../types'
+import type { Equipment, User } from '../types'
 import { exportToExcel } from '../utils/excelExport'
 import EquipmentRow from '../components/EquipmentRow'
 
@@ -21,9 +21,11 @@ interface Props {
   equipment: Equipment[]
   onSave: (eq: Equipment) => void
   onDelete: (id: string) => void
+  user: User
 }
 
-export default function EquipmentListPage({ equipment, onSave, onDelete }: Props) {
+export default function EquipmentListPage({ equipment, onSave, onDelete, user }: Props) {
+  const readOnly = user.role !== 'admin' && user.role !== 'staff'
   const [q, setQ] = useState('')
   const [fLoc, setFLoc] = useState<string | undefined>()
   const [fType, setFType] = useState<string | undefined>()
@@ -153,17 +155,19 @@ export default function EquipmentListPage({ equipment, onSave, onDelete }: Props
         )}
 
         {filtered.map(eq => (
-          <EquipmentRow key={eq.id} eq={eq} onSave={onSave} onDelete={onDelete} />
+          <EquipmentRow key={eq.id} eq={eq} onSave={onSave} onDelete={onDelete} readOnly={readOnly} />
         ))}
-
-        {/* "Add new" accordion always at bottom */}
-        <EquipmentRow
-          key="__new__"
-          eq={EMPTY_EQ()}
-          isNew
-          onSave={onSave}
-          onDelete={() => {}}
-        />
+        
+        {/* "Add new" accordion always at bottom - Restricted by role */}
+        {!readOnly && (
+          <EquipmentRow
+            key="__new__"
+            eq={EMPTY_EQ()}
+            isNew
+            onSave={onSave}
+            onDelete={() => {}}
+          />
+        )}
       </div>
     </div>
   )

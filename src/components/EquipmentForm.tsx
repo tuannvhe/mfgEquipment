@@ -18,6 +18,7 @@ interface Props {
   onSave: (eq: Equipment) => void
   onDelete: (id: string) => void
   onCancel: () => void
+  readOnly?: boolean
 }
 
 const TdLabel = ({ children, colSpan = 1, className = '' }: any) => (
@@ -37,6 +38,8 @@ const ExcelInput = ({ value, onChange, placeholder, className = '' }: any) => (
     value={value || ''} 
     onChange={e => onChange(e.target.value)} 
     placeholder={placeholder} 
+    readOnly={className.includes('read-only')}
+    disabled={className.includes('read-only')}
     className={`w-full h-full min-h-[34px] px-2 py-1 text-center text-[12.5px] bg-transparent border-none outline-none focus:bg-[#f6fbf0] font-semibold text-slate-800 ${className}`} 
   />
 );
@@ -45,6 +48,7 @@ const ExcelSelect = ({ value, onChange, options, className = '' }: any) => (
   <select 
     value={value || ''} 
     onChange={e => onChange(e.target.value)} 
+    disabled={className.includes('read-only')}
     className={`w-full h-full min-h-[34px] px-1 py-1 text-center text-[12.5px] bg-transparent border-none outline-none focus:bg-[#f6fbf0] font-semibold text-slate-800 ${className}`}
   >
     <option value="" disabled>-- Chọn --</option>
@@ -60,12 +64,14 @@ const ExcelDatePicker = ({ value, onChange, className = '' }: any) => (
     variant="borderless"
     allowClear={false}
     placeholder="Chọn ngày"
+    disabled={className.includes('read-only')}
     className={`w-full h-full max-h-[30px] text-center font-semibold text-slate-800 date-picker-excel ${className}`}
     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
   />
 );
 
-export default function EquipmentForm({ initialData, isNew, onSave, onDelete, onCancel }: Props) {
+export default function EquipmentForm({ initialData, isNew, onSave, onDelete, onCancel, readOnly = false }: Props) {
+  const inputClass = readOnly ? 'read-only cursor-default' : ''
   const [form, setForm] = useState<Equipment>({ ...initialData })
   const printRef = useRef<HTMLDivElement>(null)
 
@@ -138,8 +144,10 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   }
 
   // Row Management Helpers
-  const pRowCount = Math.max(4 + extraP, form.periodicItems?.length || 0)
-  const sRowCount = Math.max(4 + extraS, form.spareParts?.length || 0)
+  const commonExtra = Math.max(extraP, extraS)
+  const commonLength = Math.max(form.periodicItems?.length || 0, form.spareParts?.length || 0)
+  const pRowCount = Math.max(4 + commonExtra, commonLength)
+  const sRowCount = Math.max(4 + commonExtra, commonLength)
   const botRowCount = Math.max(4 + extraBot, form.inspections?.length || 0)
 
   const clearPRow = (i: number) => {
@@ -153,6 +161,12 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     if (newP.length > i) newP.splice(i, 1)
     set('periodicItems', newP)
     if (extraP > 0) setExtraP(p => p - 1)
+
+    // Also delete from spareParts
+    const newS = [...(form.spareParts || [])]
+    if (newS.length > i) newS.splice(i, 1)
+    set('spareParts', newS)
+    if (extraS > 0) setExtraS(s => s - 1)
   }
 
   const clearSRow = (i: number) => {
@@ -166,6 +180,12 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     if (newS.length > i) newS.splice(i, 1)
     set('spareParts', newS)
     if (extraS > 0) setExtraS(s => s - 1)
+
+    // Also delete from periodicItems
+    const newP = [...(form.periodicItems || [])]
+    if (newP.length > i) newP.splice(i, 1)
+    set('periodicItems', newP)
+    if (extraP > 0) setExtraP(p => p - 1)
   }
 
   const clearBotRow = (i: number) => {
@@ -190,7 +210,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
           {isNew ? 'TẠO MỚI HỒ SƠ THIẾT BỊ (MFG. EQUIPMENT RECORD)' : 'CHỈNH SỬA HỒ SƠ THIẾT BỊ'}
         </span>
         <Space size="middle">
-          {!isNew && (
+          {!isNew && !readOnly && (
             <Button
               size="small"
               danger
@@ -219,16 +239,18 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
               In Hồ Sơ (A4)
             </Button>
           )}
-          <Button
-            size="small"
-            type="primary"
-            icon={<Save size={14} />}
-            onClick={handleSave}
-            style={{ background: '#2d5f1b', border: 'none', boxShadow: '0 4px 12px rgba(45, 95, 27, 0.2)', fontSize: 13 }}
-            className='rounded-lg'
-          >
-            {isNew ? 'Lưu hồ sơ mới' : 'Lưu thay đổi'}
-          </Button>
+          {!readOnly && (
+            <Button
+              size="small"
+              type="primary"
+              icon={<Save size={14} />}
+              onClick={handleSave}
+              style={{ background: '#2d5f1b', border: 'none', boxShadow: '0 4px 12px rgba(45, 95, 27, 0.2)', fontSize: 13 }}
+              className='rounded-lg'
+            >
+              {isNew ? 'Lưu hồ sơ mới' : 'Lưu thay đổi'}
+            </Button>
+          )}
         </Space>
       </div>
 
@@ -283,9 +305,9 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
               {/* === ROW 2 === */}
               <tr>
                 <TdLabel>Applied Model Name<br/>Tên mô hình áp dụng</TdLabel>
-                <TdValue colSpan={3}><ExcelInput value={form.appmodel} onChange={(v: string) => set('appmodel', v)} placeholder="Ví dụ: 3510S" /></TdValue>
+                <TdValue colSpan={3}><ExcelInput value={form.appmodel} onChange={(v: string) => set('appmodel', v)} placeholder="Ví dụ: 3510S" className={inputClass} /></TdValue>
                 <TdLabel>Manufacturer Name<br/>Tên nhà sản xuất</TdLabel>
-                <TdValue colSpan={3}><ExcelInput value={form.mfgname} onChange={(v: string) => set('mfgname', v)} placeholder="Ví dụ: CHINA" /></TdValue>
+                <TdValue colSpan={3}><ExcelInput value={form.mfgname} onChange={(v: string) => set('mfgname', v)} placeholder="Ví dụ: CHINA" className={inputClass} /></TdValue>
               </tr>
 
               {/* === ROW 3 === */}
@@ -295,78 +317,79 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                   <ExcelSelect 
                     value={form.opcond} onChange={(v: any) => set('opcond', v)} 
                     options={[{value: 'Good', label: 'Good - Tốt'}, {value: 'Warning', label: 'Warning - Theo dõi'}, {value: 'Bad', label: 'Bad - Lỗi/Hỏng'}]} 
+                    className={inputClass}
                   />
                 </TdValue>
                 <TdLabel>Equipment Title<br/>Tên gọi thiết bị</TdLabel>
-                <TdValue colSpan={3}><ExcelInput value={form.eqtitle} onChange={(v: string) => set('eqtitle', v)} placeholder="Ví dụ: Capacitor Secondary..." /></TdValue>
+                <TdValue colSpan={3}><ExcelInput value={form.eqtitle} onChange={(v: string) => set('eqtitle', v)} placeholder="Ví dụ: Capacitor Secondary..." className={inputClass} /></TdValue>
               </tr>
 
               {/* === ROW 4 === */}
               <tr>
                 <TdLabel>Control Number<br/>Số kiểm soát</TdLabel>
-                <TdValue><ExcelInput value={form.ctrlnum} onChange={(v: string) => set('ctrlnum', v)} /></TdValue>
+                <TdValue><ExcelInput value={form.ctrlnum} onChange={(v: string) => set('ctrlnum', v)} className={inputClass} /></TdValue>
                 <TdLabel>Date of Installation<br/>Ngày lắp đặt</TdLabel>
-                <TdValue><ExcelDatePicker value={form.instdate} onChange={(v: string) => set('instdate', v)} /></TdValue>
+                <TdValue><ExcelDatePicker value={form.instdate} onChange={(v: string) => set('instdate', v)} className={inputClass} /></TdValue>
                 <TdLabel>Model<br/>Tên mẫu</TdLabel>
-                <TdValue><ExcelInput value={form.model} onChange={(v: string) => set('model', v)} className="font-mono text-blue-800" /></TdValue>
+                <TdValue><ExcelInput value={form.model} onChange={(v: string) => set('model', v)} className={`font-mono text-blue-800 ${inputClass}`} /></TdValue>
                 <TdLabel>Weight<br/>Trọng lượng</TdLabel>
-                <TdValue><ExcelInput value={form.weight} onChange={(v: string) => set('weight', v)} /></TdValue>
+                <TdValue><ExcelInput value={form.weight} onChange={(v: string) => set('weight', v)} className={inputClass} /></TdValue>
               </tr>
 
               {/* === ROW 5 === */}
               <tr>
                 <TdLabel>Equipment Type<br/>Phân loại thiết bị</TdLabel>
-                <TdValue><ExcelSelect value={form.eqtype} onChange={(v: string) => set('eqtype', v)} options={EQ_TYPES} /></TdValue>
+                <TdValue><ExcelSelect value={form.eqtype} onChange={(v: string) => set('eqtype', v)} options={EQ_TYPES} className={inputClass} /></TdValue>
                 <TdLabel>Installation Location<br/>Địa điểm lắp đặt</TdLabel>
-                <TdValue><ExcelSelect value={form.location} onChange={(v: string) => set('location', v)} options={LOCATIONS} /></TdValue>
+                <TdValue><ExcelSelect value={form.location} onChange={(v: string) => set('location', v)} options={LOCATIONS} className={inputClass} /></TdValue>
                 <TdLabel>Serial No<br/>Số Seri</TdLabel>
-                <TdValue><ExcelInput value={form.serial} onChange={(v: string) => set('serial', v)} className="font-mono text-blue-800" /></TdValue>
+                <TdValue><ExcelInput value={form.serial} onChange={(v: string) => set('serial', v)} className={`font-mono text-blue-800 ${inputClass}`} /></TdValue>
                 <TdLabel>Power<br/>Nguồn điện</TdLabel>
-                <TdValue><ExcelInput value={form.power} onChange={(v: string) => set('power', v)} className="font-mono" /></TdValue>
+                <TdValue><ExcelInput value={form.power} onChange={(v: string) => set('power', v)} className={`font-mono ${inputClass}`} /></TdValue>
               </tr>
 
               {/* === ROW 6 === */}
               <tr>
                 <TdLabel>Equipment Price<br/>Giá thiết bị</TdLabel>
-                <TdValue><ExcelInput value={form.value} onChange={(v: string) => set('value', v)} /></TdValue>
+                <TdValue><ExcelInput value={form.value} onChange={(v: string) => set('value', v)} className={inputClass} /></TdValue>
                 <TdLabel>Responsible Person<br/>Người phụ trách</TdLabel>
-                <TdValue><ExcelInput value={form.person} onChange={(v: string) => set('person', v)} /></TdValue>
+                <TdValue><ExcelInput value={form.person} onChange={(v: string) => set('person', v)} className={inputClass} /></TdValue>
                 <TdLabel>Date of Manufacture<br/>Ngày sản xuất</TdLabel>
-                <TdValue><ExcelDatePicker value={form.mfgdate} onChange={(v: string) => set('mfgdate', v)} /></TdValue>
+                <TdValue><ExcelDatePicker value={form.mfgdate} onChange={(v: string) => set('mfgdate', v)} className={inputClass} /></TdValue>
                 <TdLabel>Size<br/>Kích thước</TdLabel>
-                <TdValue><ExcelInput value={form.size} onChange={(v: string) => set('size', v)} className="font-mono" /></TdValue>
+                <TdValue><ExcelInput value={form.size} onChange={(v: string) => set('size', v)} className={`font-mono ${inputClass}`} /></TdValue>
               </tr>
 
               {/* === ROW 7 === */}
               <tr>
                 <TdValue colSpan={4} className="bg-[#f0f4eb] p-0 relative group/photo hover:bg-[#e6ebdf] transition-colors cursor-pointer border-black">
-                  <label className="flex flex-col h-full min-h-[140px] w-full items-center justify-center cursor-pointer m-0">
-                    <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'photo1')} />
+                  <label className={`flex flex-col h-full min-h-[140px] w-full items-center justify-center ${readOnly ? 'cursor-default' : 'cursor-pointer'} m-0`}>
+                    {!readOnly && <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'photo1')} />}
                     {form.photo1 ? (
                       <div className="relative h-full w-full flex items-center justify-center bg-white">
                         <img src={form.photo1} alt="Machine Photo 1" className="max-h-[136px] max-w-full object-contain z-10 p-1" />
-                        <button onClick={(e) => { e.preventDefault(); set('photo1', ''); }} className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-600 text-white rounded flex items-center justify-center p-1.5 opacity-0 group-hover/photo:opacity-100 transition-opacity z-20 shadow-sm" title="Xóa ảnh này"><Trash2 size={16} /></button>
+                        {!readOnly && <button onClick={(e) => { e.preventDefault(); set('photo1', ''); }} className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-600 text-white rounded flex items-center justify-center p-1.5 opacity-0 group-hover/photo:opacity-100 transition-opacity z-20 shadow-sm" title="Xóa ảnh này"><Trash2 size={16} /></button>}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center opacity-50 group-hover/photo:opacity-100 transition-opacity text-center px-4">
                         <Upload size={24} className="mb-2 text-[#2d5f1b]" />
-                        <span className="text-[11px] font-bold text-[#2d5f1b] uppercase tracking-widest text-center px-4">Tải lên<br/>(Machine Photo)</span>
+                        <span className="text-[11px] font-bold text-[#2d5f1b] uppercase tracking-widest text-center px-4">{readOnly ? 'Chưa có ảnh' : 'Tải lên'}<br/>(Machine Photo)</span>
                       </div>
                     )}
                   </label>
                 </TdValue>
                 <TdValue colSpan={4} className="bg-[#f0f4eb] border-l-0 p-0 relative group/photo hover:bg-[#e6ebdf] transition-colors cursor-pointer border-black">
-                  <label className="flex flex-col h-full min-h-[140px] w-full items-center justify-center cursor-pointer m-0">
-                    <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'photo2')} />
+                  <label className={`flex flex-col h-full min-h-[140px] w-full items-center justify-center ${readOnly ? 'cursor-default' : 'cursor-pointer'} m-0`}>
+                    {!readOnly && <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'photo2')} />}
                     {form.photo2 ? (
                       <div className="relative h-full w-full flex items-center justify-center bg-white">
                         <img src={form.photo2} alt="Machine Label Photo" className="max-h-[136px] max-w-full object-contain z-10 p-1" />
-                        <button onClick={(e) => { e.preventDefault(); set('photo2', ''); }} className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-600 text-white rounded flex items-center justify-center p-1.5 opacity-0 group-hover/photo:opacity-100 transition-opacity z-20 shadow-sm" title="Xóa ảnh này"><Trash2 size={16} /></button>
+                        {!readOnly && <button onClick={(e) => { e.preventDefault(); set('photo2', ''); }} className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-600 text-white rounded flex items-center justify-center p-1.5 opacity-0 group-hover/photo:opacity-100 transition-opacity z-20 shadow-sm" title="Xóa ảnh này"><Trash2 size={16} /></button>}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center opacity-50 group-hover/photo:opacity-100 transition-opacity text-center px-4">
                         <Upload size={24} className="mb-2 text-[#2d5f1b]" />
-                        <span className="text-[11px] font-bold text-[#2d5f1b] uppercase tracking-widest text-center px-4">Tải Tem máy lên<br/>(Nameplate Photo)</span>
+                        <span className="text-[11px] font-bold text-[#2d5f1b] uppercase tracking-widest text-center px-4">{readOnly ? 'Chưa có ảnh' : 'Tải Tem máy lên'}<br/>(Nameplate Photo)</span>
                       </div>
                     )}
                   </label>
@@ -400,14 +423,16 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                             return (
                               <tr key={`p_${i}`} className="group">
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelInput value={p.interval} onChange={(v: string) => setPItem(i, 'interval', v)} />
+                                  <ExcelInput value={p.interval} onChange={(v: string) => setPItem(i, 'interval', v)} className={inputClass} />
                                 </td>
                                 <td className="border-b border-black bg-white p-0 align-middle relative">
-                                  <ExcelInput value={p.content} onChange={(v: string) => setPItem(i, 'content', v)} className="text-left" />
-                                  <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
-                                    <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearPRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
-                                    {pRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deletePRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
-                                  </div>
+                                  <ExcelInput value={p.content} onChange={(v: string) => setPItem(i, 'content', v)} className={`text-left ${inputClass}`} />
+                                  {!readOnly && (
+                                    <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
+                                      <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearPRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
+                                      {pRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deletePRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             )
@@ -424,14 +449,16 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                             return (
                               <tr key={`botL_${i}`} className="group">
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelDatePicker value={r.date} onChange={(v: string) => setInsp(i, 'date', v)} />
+                                  <ExcelDatePicker value={r.date} onChange={(v: string) => setInsp(i, 'date', v)} className={inputClass} />
                                 </td>
                                 <td className="border-b border-black bg-white p-0 align-middle relative">
-                                  <ExcelInput value={r.detail} onChange={(v: string) => setInsp(i, 'detail', v)} className="text-left" />
-                                  <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
-                                    <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearBotRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
-                                    {botRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteBotLRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
-                                  </div>
+                                  <ExcelInput value={r.detail} onChange={(v: string) => setInsp(i, 'detail', v)} className={`text-left ${inputClass}`} />
+                                  {!readOnly && (
+                                    <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
+                                      <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearBotRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
+                                      {botRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteBotLRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             )
@@ -467,20 +494,22 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                             return (
                               <tr key={`s_${i}`} className="group">
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelInput value={s.name} onChange={(v: string) => setSPart(i, 'name', v)} />
+                                  <ExcelInput value={s.name} onChange={(v: string) => setSPart(i, 'name', v)} className={inputClass} />
                                 </td>
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelInput value={s.partnum} onChange={(v: string) => setSPart(i, 'partnum', v)} className="font-mono text-blue-800" />
+                                  <ExcelInput value={s.partnum} onChange={(v: string) => setSPart(i, 'partnum', v)} className={`font-mono text-blue-800 ${inputClass}`} />
                                 </td>
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelInput value={s.spec} onChange={(v: string) => setSPart(i, 'spec', v)} />
+                                  <ExcelInput value={s.spec} onChange={(v: string) => setSPart(i, 'spec', v)} className={inputClass} />
                                 </td>
                                 <td className="border-b border-black bg-white p-0 align-middle relative">
-                                  <ExcelInput value={s.qty} onChange={(v: string) => setSPart(i, 'qty', v)} type="number" />
-                                  <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
-                                    <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearSRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
-                                    {sRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteSRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
-                                  </div>
+                                  <ExcelInput value={s.qty} onChange={(v: string) => setSPart(i, 'qty', v)} type="number" className={inputClass} />
+                                  {!readOnly && (
+                                    <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
+                                      <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearSRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
+                                      {sRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteSRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             )
@@ -499,20 +528,22 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                             return (
                               <tr key={`botR_${i}`} className="group">
                                 <td className="border-b border-r border-black bg-white p-0  align-middle">
-                                  <ExcelInput value={r.failure} onChange={(v: string) => setInsp(i, 'failure', v)} />
+                                  <ExcelInput value={r.failure} onChange={(v: string) => setInsp(i, 'failure', v)} className={inputClass} />
                                 </td>
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelInput value={r.replacement} onChange={(v: string) => setInsp(i, 'replacement', v)} />
+                                  <ExcelInput value={r.replacement} onChange={(v: string) => setInsp(i, 'replacement', v)} className={inputClass} />
                                 </td>
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelInput value={r.inspector} onChange={(v: string) => setInsp(i, 'inspector', v)} />
+                                  <ExcelInput value={r.inspector} onChange={(v: string) => setInsp(i, 'inspector', v)} className={inputClass} />
                                 </td>
                                 <td className="border-b border-black bg-white p-0 align-middle relative">
-                                  <ExcelInput value={r.remarks} onChange={(v: string) => setInsp(i, 'remarks', v)} />
-                                  <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
-                                    <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearBotRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
-                                    {botRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteBotLRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
-                                  </div>
+                                  <ExcelInput value={r.remarks} onChange={(v: string) => setInsp(i, 'remarks', v)} className={inputClass} />
+                                  {!readOnly && (
+                                    <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
+                                      <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearBotRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
+                                      {botRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteBotLRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             )
@@ -526,12 +557,14 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
               </tr>
               <tr className="no-print">
                 <td colSpan={8} className="border-t border-black p-0">
-                  <button
-                    onClick={() => { setExtraP(v => v + 1); setExtraS(v => v + 1); setExtraBot(v => v + 1) }}
-                    className="w-full h-7 bg-slate-50 hover:bg-[#eef4ea] flex items-center justify-center text-[11px] font-bold text-slate-400 hover:text-[#2d5f1b] transition-colors"
-                  >
-                    <Plus size={12} className="mr-1" /> Thêm dòng cho tất cả
-                  </button>
+                  {!readOnly && (
+                    <button
+                      onClick={() => { setExtraP(v => v + 1); setExtraS(v => v + 1); setExtraBot(v => v + 1) }}
+                      className="w-full h-7 bg-slate-50 hover:bg-[#eef4ea] flex items-center justify-center text-[11px] font-bold text-slate-400 hover:text-[#2d5f1b] transition-colors"
+                    >
+                      <Plus size={12} className="mr-1" /> Thêm dòng
+                    </button>
+                  )}
                 </td>
               </tr>
 

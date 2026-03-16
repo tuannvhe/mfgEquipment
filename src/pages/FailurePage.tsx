@@ -1,12 +1,15 @@
 import { useMemo } from 'react'
 import { Table, Tag } from 'antd'
-import type { Equipment } from '../types'
+import type { Equipment, User } from '../types'
 
-interface Props { equipment: Equipment[] }
+interface Props { 
+  equipment: Equipment[] 
+  user: User
+}
 
 const SKIP = new Set(['không có', 'không', 'máy mới', ''])
 
-export default function FailurePage({ equipment }: Props) {
+export default function FailurePage({ equipment, user }: Props) {
   const rows = useMemo(
     () =>
       equipment

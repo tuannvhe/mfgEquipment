@@ -1,10 +1,13 @@
 import { useMemo } from 'react'
 import { Table, Tag } from 'antd'
-import type { Equipment } from '../types'
+import type { Equipment, User } from '../types'
 
-interface Props { equipment: Equipment[] }
+interface Props { 
+  equipment: Equipment[]
+  user: User
+}
 
-export default function InspectionPage({ equipment }: Props) {
+export default function InspectionPage({ equipment, user }: Props) {
   const rows = useMemo(
     () =>
       equipment

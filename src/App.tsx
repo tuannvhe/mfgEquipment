@@ -1,4 +1,4 @@
-import { useState } from 'react' // Trigger HMR
+import { useEffect, useState } from 'react'
 import { ConfigProvider, Layout, Menu, Badge, Button, App as AntApp, theme, Avatar, Space, Typography, Divider, Tooltip } from 'antd'
 import { 
   Settings2, 
@@ -6,7 +6,7 @@ import {
   Wrench, 
   AlertTriangle, 
   FileSpreadsheet, 
-  User, 
+  User as UserIcon, 
   LogOut,
   ChevronRight,
   PanelLeftClose,
@@ -18,6 +18,8 @@ import InspectionPage    from './pages/InspectionPage'
 import SparePartsPage    from './pages/SparePartsPage'
 import FailurePage       from './pages/FailurePage'
 import LoginPage         from './pages/LoginPage'
+import { authService }   from './utils/authService'
+import type { User }      from './types'
 
 const { Header, Sider, Content } = Layout
 const { Text, Title } = Typography
@@ -34,23 +36,43 @@ const THEME_COLORS = {
   gradient: 'linear-gradient(135deg, #4C9C2E 0%, #3a7a22 100%)'
 }
 
-const NAV: { key: ViewKey; label: string; sub: string; Icon: any }[] = [
-  { key: 'list',  label: 'Danh sách thiết bị',   sub: 'Equipment List', Icon: Settings2 },
-  { key: 'insp',  label: 'Kiểm tra bảo trì',     sub: 'Inspection',     Icon: ClipboardCheck },
-  { key: 'spare', label: 'Quản lý phụ tùng',     sub: 'Spare Parts',    Icon: Wrench },
-  { key: 'fail',  label: 'Báo cáo sự cố',       sub: 'Failure Logs',    Icon: AlertTriangle },
+const NAV: { key: ViewKey; label: string; sub: string; Icon: any; roles?: string[] }[] = [
+  { key: 'list',  label: 'Danh sách thiết bị',   sub: 'Equipment List', Icon: Settings2, roles: ['admin', 'staff', 'user'] },
+  { key: 'insp',  label: 'Kiểm tra bảo trì',     sub: 'Inspection',     Icon: ClipboardCheck, roles: ['admin', 'staff'] },
+  { key: 'spare', label: 'Quản lý phụ tùng',     sub: 'Spare Parts',    Icon: Wrench, roles: ['admin', 'staff'] },
+  { key: 'fail',  label: 'Báo cáo sự cố',       sub: 'Failure Logs',    Icon: AlertTriangle, roles: ['admin', 'staff', 'user'] },
 ]
 
 function AppInner() {
-  const [user, setUser] = useState<{ name: string, role: string } | null>(null)
+  const [user, setUser] = useState<User | null>(() => authService.getCurrentUser())
   const [view, setView] = useState<ViewKey>('list')
   const [collapsed, setCollapsed] = useState(false)
+  
+  // Update view if user role doesn't allow current view
+  useEffect(() => {
+    if (user) {
+      const currentNav = NAV.find(n => n.key === view)
+      if (currentNav?.roles && !currentNav.roles.includes(user.role)) {
+        setView('list')
+      }
+    }
+  }, [user, view])
+
   const { equipment, saveEquipment, deleteEquipment, exportExcel } = useEquipmentStore()
   const { message } = AntApp.useApp()
 
   if (!user) {
-    return <LoginPage onLogin={(name, role) => setUser({ name, role })} />
+    return <LoginPage onLogin={(loggedUser) => setUser(loggedUser)} />
   }
+
+  const handleLogout = () => {
+    if (confirm('Bạn có muốn đăng xuất khỏi hệ thống?')) {
+      authService.logout()
+      setUser(null)
+    }
+  }
+
+  const filteredNav = NAV.filter(n => !n.roles || n.roles.includes(user.role))
 
   const handleSave = (eq: Parameters<typeof saveEquipment>[0]) => {
     saveEquipment(eq)
@@ -115,7 +137,7 @@ function AppInner() {
               selectedKeys={[view]}
               onClick={({ key }) => setView(key as ViewKey)}
               style={{ background: 'transparent', border: 'none' }}
-              items={NAV.map(n => ({
+              items={filteredNav.map(n => ({
                 key: n.key,
                 icon: (
                   <Tooltip title={collapsed ? n.label : ''} placement="right">
@@ -151,13 +173,13 @@ function AppInner() {
               <Space size={collapsed ? 0 : 8}>
                 <Avatar 
                   size={collapsed ? 36 : 40} 
-                  icon={<User size={collapsed ? 18 : 20} />} 
+                  icon={<UserIcon size={collapsed ? 18 : 20} />} 
                   style={{ background: THEME_COLORS.primary, color: 'white', flexShrink: 0 }}
                 />
                 {!collapsed && (
                   <div className="flex flex-col truncate max-w-[120px]">
                     <Text style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'white' }} className="truncate" title={user.name}>{user.name}</Text>
-                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }} className="truncate">{user.role}</Text>
+                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'capitalize' }} className="truncate">{user.role}</Text>
                   </div>
                 )}
               </Space>
@@ -167,9 +189,7 @@ function AppInner() {
                     type="text" 
                     shape="circle" 
                     icon={<LogOut size={16} color="rgba(255,255,255,0.6)" />} 
-                    onClick={() => {
-                      if (confirm('Bạn có muốn đăng xuất khỏi hệ thống?')) setUser(null)
-                    }}
+                    onClick={handleLogout}
                   />
                 </Tooltip>
               )}
@@ -233,10 +253,10 @@ function AppInner() {
         {/* ── Content Area ── */}
         <Content style={{ padding: '15px 20px', overflowY: 'auto' }}>
           <div className="fade-in">
-            {view === 'list'  && <EquipmentListPage equipment={equipment} onSave={handleSave} onDelete={handleDelete} />}
-            {view === 'insp'  && <InspectionPage    equipment={equipment} />}
-            {view === 'spare' && <SparePartsPage     equipment={equipment} />}
-            {view === 'fail'  && <FailurePage        equipment={equipment} />}
+            {view === 'list'  && <EquipmentListPage equipment={equipment} onSave={handleSave} onDelete={handleDelete} user={user} />}
+            {view === 'insp'  && <InspectionPage    equipment={equipment} user={user} />}
+            {view === 'spare' && <SparePartsPage     equipment={equipment} user={user} />}
+            {view === 'fail'  && <FailurePage        equipment={equipment} user={user} />}
           </div>
         </Content>
       </Layout>
