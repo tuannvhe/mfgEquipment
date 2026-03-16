@@ -1,10 +1,13 @@
 import { useMemo } from 'react'
 import { Table } from 'antd'
-import type { Equipment } from '../types'
+import type { Equipment, User } from '../types'
 
-interface Props { equipment: Equipment[] }
+interface Props { 
+  equipment: Equipment[] 
+  user: User
+}
 
-export default function SparePartsPage({ equipment }: Props) {
+export default function SparePartsPage({ equipment, user }: Props) {
   const rows = useMemo(
     () =>
       equipment.flatMap(e =>

@@ -10,10 +10,11 @@ interface Props {
   isNew?: boolean
   onSave: (eq: Equipment) => void
   onDelete: (id: string) => void
+  readOnly?: boolean
   defaultOpen?: boolean
 }
 
-export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, defaultOpen = false }: Props) {
+export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, readOnly = false, defaultOpen = false }: Props) {
   const [open, setOpen] = useState(defaultOpen)
   const [localForm, setLocalForm] = useState<Equipment>({ ...eq })
 
@@ -94,6 +95,7 @@ export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, defa
           onSave={handleSave}
           onDelete={handleDelete}
           onCancel={() => setOpen(false)}
+          readOnly={readOnly}
         />
       )}
     </div>

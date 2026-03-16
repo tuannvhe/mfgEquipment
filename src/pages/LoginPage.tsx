@@ -4,31 +4,50 @@ import { User, Lock } from 'lucide-react'
 
 const { Title, Text } = Typography
 
-export default function LoginPage({ onLogin }: { onLogin: (name: string, role: string) => void }) {
-  console.log('LoginPage rendered');
+import { authService } from '../utils/authService'
+import type { User as UserType } from '../types'
+
+export default function LoginPage({ onLogin }: { onLogin: (user: UserType) => void }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleFinish = (values: any) => {
+  const handleFinish = async (values: any) => {
     setLoading(true)
     setError('')
-    setTimeout(() => {
-      // Mock auth - accept anything for demo
+    try {
+      const response = await authService.login(values.username, values.password)
+      onLogin(response.user)
+    } catch (err: any) {
+      console.error('Login error:', err)
+      setError('Tên đăng nhập hoặc mật khẩu không đúng')
+      setLoading(false)
+      
+      // Fallback for demo purposes - since we don't have a backend yet
+      // This part should be removed in a production environment
       if (values.username && values.password) {
-        let role = 'Nhân viên'
-        if (values.username.toLowerCase().includes('admin') || values.username.toLowerCase() === 'admin') {
-          role = 'Quản trị viên'
+        let role: 'admin' | 'user' | 'staff' = 'staff'
+        if (values.username.toLowerCase().includes('admin')) role = 'admin'
+        
+        const mockUser: UserType = {
+          id: 'mock-1',
+          username: values.username,
+          name: values.username,
+          role: role
         }
-        onLogin(values.username, role)
-      } else {
-        setError('Vui lòng nhập tên đăng nhập và mật khẩu')
-        setLoading(false)
+        
+        // Simulating backend response
+        localStorage.setItem('access_token', 'mock_access_token')
+        localStorage.setItem('refresh_token', 'mock_refresh_token')
+        localStorage.setItem('user_info', JSON.stringify(mockUser))
+        
+        onLogin(mockUser)
       }
-    }, 700)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-[url('/images/bgAI.png')] bg-cover bg-center flex items-center justify-center p-4 fade-in relative overflow-hidden">
+    <div className="min-h-screen bg-[url('/images/bgAI.png')] bg-cover bg-center bg-no-repeat bg-fixed bg-blend-overlay flex items-center justify-center p-4 fade-in relative overflow-hidden"
+    >
       {/* Background Decor */}
       <div className="absolute top-[-100px] left-[-100px] w-96 h-96 bg-[#4C9C2E] rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
       <div className="absolute bottom-[-100px] right-[-100px] w-96 h-96 bg-[#2d5f1b] rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>

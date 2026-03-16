@@ -54,3 +54,18 @@ export interface Equipment {
   inspections: Inspection[]
   spareParts: SparePart[]
 }
+
+export interface User {
+  id: string
+  username: string
+  name: string
+  role: 'admin' | 'user' | 'staff' // adjust roles as needed
+  avatar?: string
+}
+
+export interface AuthResponse {
+  accessToken: string
+  refreshToken: string
+  user: User
+}
+
