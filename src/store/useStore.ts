@@ -285,7 +285,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
         icon: 'success',
         title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
         text: `Thiết bị ${eq.eqtitle} đã được lưu vào hệ thống.`,
-        timer: 2000,
+        timer: 3500,
         showConfirmButton: false,
         toast: true,
         position: 'top-end'

@@ -85,16 +85,16 @@ function AppInner() {
   const handleSave = async (eq: Parameters<typeof saveEquipment>[0]) => {
     try {
       await saveEquipment(eq)
-      message.success('Đã lưu dữ liệu thành công!')
+      //message.success('Đã lưu dữ liệu thành công!')
     } catch (error) {
       console.error('Lỗi lưu thiết bị:', error)
-      message.error('Lưu thiết bị thất bại. Vui lòng thử lại.')
+      //message.error('Lưu thiết bị thất bại. Vui lòng thử lại.')
     }
   }
 
   const handleDelete = (id: string) => {
     deleteEquipment(id)
-    message.warning('Đã xóa bản ghi thiết bị')
+    //message.warning('Đã xóa bản ghi thiết bị')
   }
 
   const currentPage = NAV.find(n => n.key === view)
