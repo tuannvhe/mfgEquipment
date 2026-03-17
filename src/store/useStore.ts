@@ -147,7 +147,7 @@ const serverImages = (eq as any)._serverImages || [];
     if (original && (isNewUpload || isRemoving)) {
       // Quan trọng: Gửi key đơn giản 'DeletedImageIds', ASP.NET sẽ tự gom vào List<int>
       formData.append('DeletedImageIds', String(original.id));
-      console.log(`🗑️ Gửi lệnh xóa ID: ${original.id} (Vị trí: ${isRight ? 'Phải' : 'Trái'})`);
+      
     }
 
     // TH 2: UPLOAD ẢNH MỚI
@@ -155,7 +155,7 @@ const serverImages = (eq as any)._serverImages || [];
       const file = dataURLtoFile(photo as string, `upload_${isRight ? 'Right' : 'Left'}.png`);
       formData.append('files', file); // Tên phải khớp chính xác với List<IFormFile> ở Backend
       formData.append('ImageTypes', isRight ? 'true' : 'false'); 
-      console.log(`📤 Gửi file mới (Vị trí: ${isRight ? 'Phải' : 'Trái'})`);
+      
     }
 
     // TH 3: GIỮ NGUYÊN ẢNH CŨ
@@ -329,7 +329,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
     // --- THÔNG BÁO XÁC NHẬN XÓA ---
     const result = await Swal.fire({
       title: 'Bạn có chắc chắn?',
-      text: "Dữ liệu thiết bị này sẽ bị xóa vĩnh viễn!",
+      text: "Dữ liệu thiết bị này sẽ bị xóa!",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
