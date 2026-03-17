@@ -254,7 +254,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
               variant="outlined"
               icon={<Trash2 size={14} />}
               onClick={() => {
-                if (confirm('Xóa thiết bị này khỏi hệ thống?')) onDelete(form.id)
+                onDelete(form.id)
               }}
               style={{ fontSize: 13 }}
               className='rounded-lg shadow-sm hover:shadow-md'

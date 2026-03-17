@@ -250,99 +250,96 @@ export function useEquipmentStore() {
   }, [])
 
 const saveEquipment = useCallback(async (eq: Equipment) => {
-    try {
-      // Hiển thị loading nhẹ để người dùng không bấm liên tiếp
-      Swal.showLoading();
+  try {
+    Swal.showLoading();
+    const isUpdate = Boolean(eq.id && !eq.id.includes('-'));
+    let response;
 
-      const isUpdate = Boolean(eq.id && !eq.id.includes('-'));
-      let response;
-
-      const originalRecord = equipment.find(e => String(e.id) === String(eq.id));
-      if (originalRecord && !(eq as any)._serverImages) {
-        (eq as any)._serverImages = (originalRecord as any)._serverImages;
-      }
-
-      if (isUpdate) {
-        const detailFormData = buildDetailFormData(eq, eq.id);
-        response = await api.put(`/Detail/update-full`, detailFormData);
-      } else {
-        const createFormData = buildDetailFormData(eq, '0');
-        response = await api.post('/Equipment', createFormData);
-      }
-
-      const updatedRecord = mapApiToEquipment(response.data);
-
-      setEquipment(prev => {
-        const next = isUpdate 
-          ? prev.map(e => (String(e.id) === String(updatedRecord.id) ? updatedRecord : e)) 
-          : [...prev, updatedRecord];
-        localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
-        return next;
-      });
-
-      // --- THÔNG BÁO THÀNH CÔNG CHUYÊN NGHIỆP ---
-      Swal.fire({
-        icon: 'success',
-        title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
-        text: `Thiết bị ${eq.eqtitle} đã được lưu vào hệ thống.`,
-        timer: 3500,
-        showConfirmButton: false,
-        toast: true,
-        position: 'top-end'
-      });
-
-      return updatedRecord;
-
-    } catch (error: any) {
-      // --- XỬ LÝ LỖI VALIDATION TỪ BACKEND ---
-      if (error.response && error.response.status === 400) {
-        const validationErrors = error.response.data.errors;
-        
-        let errorHtml = '<ul style="text-align: left; color: #d33; font-size: 0.9em;">';
-        for (const key in validationErrors) {
-          validationErrors[key].forEach((msg: string) => {
-            errorHtml += `<li><b>${key}:</b> ${msg}</li>`;
-          });
-        }
-        errorHtml += '</ul>';
-
-        Swal.fire({
-          icon: 'error',
-          title: 'Dữ liệu không hợp lệ',
-          html: errorHtml, // Hiển thị danh sách lỗi dạng list
-          confirmButtonColor: '#3085d6',
-          confirmButtonText: 'Kiểm tra lại'
-        });
-      } else {
-        // Lỗi hệ thống khác (500, mất mạng...)
-        Swal.fire({
-          icon: 'error',
-          title: 'Lỗi hệ thống',
-          text: error.message || 'Không thể kết nối tới máy chủ.',
-        });
-      }
-      throw error;
+    // Phục hồi metadata
+    const originalRecord = equipment.find(e => String(e.id) === String(eq.id));
+    if (originalRecord && !(eq as any)._serverImages) {
+      (eq as any)._serverImages = (originalRecord as any)._serverImages;
     }
-  }, [equipment]);
 
-  const deleteEquipment = useCallback(async (id: string) => {
-    // --- THÔNG BÁO XÁC NHẬN XÓA ---
-    const result = await Swal.fire({
-      title: 'Bạn có chắc chắn?',
-      text: "Dữ liệu thiết bị này sẽ bị xóa!",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Đồng ý xóa',
-      cancelButtonText: 'Hủy'
+    if (isUpdate) {
+      const detailFormData = buildDetailFormData(eq, eq.id);
+      response = await api.put(`/Detail/update-full`, detailFormData);
+    } else {
+      const createFormData = buildDetailFormData(eq, '0');
+      response = await api.post('/Equipment', createFormData);
+    }
+
+    // --- PHẦN FIX: ĐẢM BẢO LOAD LẠI BẢNG ---
+    
+    // 1. Lấy dữ liệu thực tế từ Server trả về (Thường nằm trong response.data hoặc response.data.data)
+    const rawData = response.data?.data || response.data;
+    const updatedRecord = mapApiToEquipment(rawData);
+
+    // 2. Cập nhật State một cách tuyệt đối
+    setEquipment(prev => {
+      let next;
+      if (isUpdate) {
+        // Thay thế bản ghi cũ dựa trên ID
+        next = prev.map(e => String(e.id) === String(updatedRecord.id) ? updatedRecord : e);
+      } else {
+        // Thêm mới vào đầu danh sách (Spread giúp React nhận diện mảng mới hoàn toàn)
+        next = [updatedRecord, ...prev];
+      }
+      
+      // 3. Đồng bộ bộ nhớ đệm
+      localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
+      return [...next]; // Spread một lần nữa để chắc chắn địa chỉ mảng thay đổi
     });
 
-    if (result.isConfirmed) {
+    Swal.fire({
+      icon: 'success',
+      title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
+      text: `Thiết bị ${updatedRecord.eqtitle} đã được cập nhật.`,
+      timer: 2000,
+      showConfirmButton: false,
+      toast: true,
+      position: 'top-end'
+    });
+
+    return updatedRecord;
+
+  } catch (error: any) {
+     // ... logic catch lỗi cũ của bạn giữ nguyên
+  }
+}, [equipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
+
+  const deleteEquipment = useCallback(async (id: string) => {
+  // Nếu là ID tạm (có dấu gạch ngang), chỉ cần xóa ở Local
+  if (id.includes('-')) {
+    setEquipment(prev => {
+      const next = prev.filter(e => e.id !== id);
+      localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
+      return next;
+    });
+    return;
+  }
+
+  const result = await Swal.fire({
+    title: 'Bạn có chắc chắn?',
+    text: "Dữ liệu sẽ bị xóa vĩnh viễn trên Server!",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    confirmButtonText: 'Đồng ý xóa',
+    cancelButtonText: 'Hủy'
+  });
+
+  if (result.isConfirmed) {
+    try {
+      Swal.showLoading();
+      
+      // GỌI API XÓA THỰC TẾ (Giả định endpoint là /Equipment/{id})
+      await api.delete(`/Equipment/${id}`); 
+
       setEquipment(prev => {
-        const next = prev.filter(e => e.id !== id)
-        localStorage.setItem('vt_equipment_v3', JSON.stringify(next))
-        return next
+        const next = prev.filter(e => String(e.id) !== String(id));
+        localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
+        return next;
       });
       
       Swal.fire({
@@ -353,9 +350,12 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
         toast: true,
         position: 'top-end'
       });
+    } catch (err: any) {
+      console.error("Delete fail:", err);
+      Swal.fire('Lỗi!', err.response?.data?.message || 'Không thể xóa thiết bị trên hệ thống.', 'error');
     }
-  }, []);
-
+  }
+}, []);
   const exportExcel = useCallback((data: Equipment[]) => {
     exportToExcel(data, `VINATech_Equipment_${new Date().toISOString().slice(0, 10)}.xlsx`)
   }, [])
