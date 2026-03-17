@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Button, Space, Tooltip, DatePicker
 } from 'antd'
@@ -8,6 +8,7 @@ import { uid } from '../store/useStore'
 import { useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import dayjs from 'dayjs'
+import api from '../utils/api'
 
 const EQ_TYPES = ['Winding', 'Riveting Assembly', 'Capacitor Assembly', 'Other']
 const LOCATIONS = ['Bắc Giang #1', 'Bắc Giang #2', 'Bắc Ninh', 'Hà Nam', 'Hưng Yên']
@@ -74,6 +75,42 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   const inputClass = readOnly ? 'read-only cursor-default' : ''
   const [form, setForm] = useState<Equipment>({ ...initialData })
   const printRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (isNew || !initialData.id) return
+
+    api.get(`/Detail/${initialData.id}`)
+      .then(res => {
+        const data = res.data
+        setForm(prev => ({
+          ...prev,
+          appmodel: data.appliedModelName ?? data.appmodel ?? prev.appmodel,
+          opcond: data.operatingConditions ?? data.opcond ?? prev.opcond,
+          ctrlnum: data.controlNumber ?? data.ctrlnum ?? prev.ctrlnum,
+          eqtitle: data.equipmentTitle ?? data.eqtitle ?? prev.eqtitle,
+          value: data.equipmentPrice != null ? String(data.equipmentPrice) : prev.value,
+          location: data.installationLocation ?? data.location ?? prev.location,
+          instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : prev.instdate,
+          person: data.responsiblePerson ?? data.person ?? prev.person,
+          mfgname: data.manufacturerName ?? data.mfgname ?? prev.mfgname,
+          model: data.manufacturerModel ?? data.model ?? prev.model,
+          serial: data.serialNo ?? data.serial ?? prev.serial,
+          power: data.power ?? prev.power,
+          mfgdate: data.dateOfManufacture ? data.dateOfManufacture.split('T')[0] : prev.mfgdate,
+          weight: data.weight ?? prev.weight,
+          size: data.size ?? prev.size,
+          eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? prev.eqtype,
+          photo1: data.mainImagePath?.[0] || (data.mainImages?.find((i:any)=>i.type===false)?.path) || prev.photo1,
+          photo2: data.mainImagePath?.[1] || (data.mainImages?.find((i:any)=>i.type===true)?.path) || prev.photo2,
+          periodicItems: data.periodicItems ?? data.periodicInspections ?? prev.periodicItems,
+          inspections: data.inspections ?? prev.inspections,
+          spareParts: data.spareParts ?? prev.spareParts,
+        }))
+      })
+      .catch(err => {
+        console.warn('Không tải được Detail', err)
+      })
+  }, [initialData.id, isNew])
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,

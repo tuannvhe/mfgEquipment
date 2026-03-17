@@ -47,6 +47,9 @@ function AppInner() {
   const [user, setUser] = useState<User | null>(() => authService.getCurrentUser())
   const [view, setView] = useState<ViewKey>('list')
   const [collapsed, setCollapsed] = useState(false)
+
+  const { equipment, loading, saveEquipment, deleteEquipment, exportExcel } = useEquipmentStore()
+  const { message } = AntApp.useApp()
   
   // Update view if user role doesn't allow current view
   useEffect(() => {
@@ -58,11 +61,16 @@ function AppInner() {
     }
   }, [user, view])
 
-  const { equipment, saveEquipment, deleteEquipment, exportExcel } = useEquipmentStore()
-  const { message } = AntApp.useApp()
-
   if (!user) {
     return <LoginPage onLogin={(loggedUser) => setUser(loggedUser)} />
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500 font-semibold">
+        Đang tải danh sách thiết bị...
+      </div>
+    )
   }
 
   const handleLogout = () => {
@@ -74,9 +82,14 @@ function AppInner() {
 
   const filteredNav = NAV.filter(n => !n.roles || n.roles.includes(user.role))
 
-  const handleSave = (eq: Parameters<typeof saveEquipment>[0]) => {
-    saveEquipment(eq)
-    message.success('Đã lưu dữ liệu thành công!')
+  const handleSave = async (eq: Parameters<typeof saveEquipment>[0]) => {
+    try {
+      await saveEquipment(eq)
+      message.success('Đã lưu dữ liệu thành công!')
+    } catch (error) {
+      console.error('Lỗi lưu thiết bị:', error)
+      message.error('Lưu thiết bị thất bại. Vui lòng thử lại.')
+    }
   }
 
   const handleDelete = (id: string) => {

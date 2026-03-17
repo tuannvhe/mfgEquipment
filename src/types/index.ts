@@ -53,6 +53,7 @@ export interface Equipment {
   periodicItems: PeriodicItem[]
   inspections: Inspection[]
   spareParts: SparePart[]
+  _serverImages?: { id: number | string; type: boolean }[];
 }
 
 export interface User {

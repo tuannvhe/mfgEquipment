@@ -25,7 +25,7 @@ interface Props {
 }
 
 export default function EquipmentListPage({ equipment, onSave, onDelete, user }: Props) {
-  const readOnly = user.role !== 'admin' && user.role !== 'staff'
+  const readOnly = false // Bỏ phân quyền tạm thời: cho phép hành động thêm/sửa/xóa với mọi user
   const [q, setQ] = useState('')
   const [fLoc, setFLoc] = useState<string | undefined>()
   const [fType, setFType] = useState<string | undefined>()

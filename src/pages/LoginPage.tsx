@@ -16,32 +16,12 @@ export default function LoginPage({ onLogin }: { onLogin: (user: UserType) => vo
     setError('')
     try {
       const response = await authService.login(values.username, values.password)
+      setLoading(false)
       onLogin(response.user)
     } catch (err: any) {
       console.error('Login error:', err)
       setError('Tên đăng nhập hoặc mật khẩu không đúng')
       setLoading(false)
-      
-      // Fallback for demo purposes - since we don't have a backend yet
-      // This part should be removed in a production environment
-      if (values.username && values.password) {
-        let role: 'admin' | 'user' | 'staff' = 'staff'
-        if (values.username.toLowerCase().includes('admin')) role = 'admin'
-        
-        const mockUser: UserType = {
-          id: 'mock-1',
-          username: values.username,
-          name: values.username,
-          role: role
-        }
-        
-        // Simulating backend response
-        localStorage.setItem('access_token', 'mock_access_token')
-        localStorage.setItem('refresh_token', 'mock_refresh_token')
-        localStorage.setItem('user_info', JSON.stringify(mockUser))
-        
-        onLogin(mockUser)
-      }
     }
   }
 
