@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Input, Select, Button, Space } from 'antd'
-import { Search, X, Settings2, CheckCircle2, AlertCircle, XCircle, Download } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Input, Select, Button, Pagination } from 'antd'
+import { Search, X, Settings2, CheckCircle2, AlertCircle, XCircle, Download, PlusCircle } from 'lucide-react'
 import type { Equipment, User } from '../types'
 import { exportToExcel } from '../utils/excelExport'
 import EquipmentRow from '../components/EquipmentRow'
@@ -25,13 +25,14 @@ interface Props {
 }
 
 export default function EquipmentListPage({ equipment, onSave, onDelete, user }: Props) {
-  const readOnly = false // Bỏ phân quyền tạm thời: cho phép hành động thêm/sửa/xóa với mọi user
+  const readOnly = false
   const [q, setQ] = useState('')
   const [fLoc, setFLoc] = useState<string | undefined>()
   const [fType, setFType] = useState<string | undefined>()
   const [fStatus, setFStatus] = useState<string | undefined>()
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [page, setPage] = useState(1)
+  const [showNewForm, setShowNewForm] = useState(false)
+  const PAGE_SIZE = 8
 
   const filtered = useMemo(
     () =>
@@ -51,14 +52,6 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
     [equipment, q, fLoc, fType, fStatus]
   )
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [q, fLoc, fType, fStatus])
-const paginatedEquipment = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filtered.slice(startIndex, startIndex + pageSize);
-  }, [filtered, currentPage, pageSize]);
-  
   const stats = {
     total: equipment.length,
     good: equipment.filter(e => e.opcond === 'Good').length,
@@ -74,6 +67,11 @@ const paginatedEquipment = useMemo(() => {
   ]
 
   const hasFilter = !!(q || fLoc || fType || fStatus)
+
+  // Reset về trang 1 khi filter thay đổi
+  const handleFilterChange = (fn: () => void) => { fn(); setPage(1) }
+
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div className="space-y-2">
@@ -92,31 +90,31 @@ const paginatedEquipment = useMemo(() => {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
+      {/* Filters + Add button */}
+      <div className="flex flex-wrap gap-2 items-center">
         <Input
           prefix={<Search size={14} className="text-slate-400" />}
           placeholder="Tên, model, S/N, số kiểm soát..."
           value={q}
-          onChange={e => setQ(e.target.value)}
+          onChange={e => handleFilterChange(() => setQ(e.target.value))}
           allowClear
           size="middle"
-          className="flex-1 min-w-[240px] h-8 max-w-sm"
+          className="flex-1 min-w-[200px] h-8 max-w-sm"
         />
         <Select
           size="middle"
           placeholder="Tất cả vị trí"
           value={fLoc}
-          onChange={setFLoc}
+          onChange={v => handleFilterChange(() => setFLoc(v))}
           allowClear
-          className="min-w-[140px] h-8 "
+          className="min-w-[140px] h-8"
           options={LOCATIONS.map(l => ({ value: l, label: l }))}
         />
         <Select
           size="middle"
           placeholder="Tất cả loại"
           value={fType}
-          onChange={setFType}
+          onChange={v => handleFilterChange(() => setFType(v))}
           allowClear
           className="min-w-[160px] h-8"
           options={EQ_TYPES.map(t => ({ value: t, label: t }))}
@@ -125,7 +123,7 @@ const paginatedEquipment = useMemo(() => {
           size="middle"
           placeholder="Trạng thái"
           value={fStatus}
-          onChange={setFStatus}
+          onChange={v => handleFilterChange(() => setFStatus(v))}
           allowClear
           className="min-w-[130px] h-8"
           options={[
@@ -139,21 +137,46 @@ const paginatedEquipment = useMemo(() => {
             size="middle"
             type="text"
             icon={<X size={14} />}
-            onClick={() => { setQ(''); setFLoc(undefined); setFType(undefined); setFStatus(undefined) }}
+            onClick={() => handleFilterChange(() => { setQ(''); setFLoc(undefined); setFType(undefined); setFStatus(undefined) })}
             className="text-slate-400"
           >
             Xóa lọc
           </Button>
         )}
-        <Button
-          size="middle"
-          icon={<Download size={14} />}
-          onClick={() => exportToExcel(filtered)}
-          className="ml-auto bg-[#2d5f1b] text-white hover:!bg-[#1e4012] hover:!text-white border-none flex items-center"
-        >
-          Xuất Excel
-        </Button>
+        <div className="ml-auto flex gap-2">
+          {!readOnly && (
+            <Button
+              size="middle"
+              type="primary"
+              icon={<PlusCircle size={14} />}
+              onClick={() => setShowNewForm(v => !v)}
+              style={{ background: '#2d5f1b', border: 'none' }}
+            >
+              Thêm hồ sơ
+            </Button>
+          )}
+          <Button
+            size="middle"
+            icon={<Download size={14} />}
+            onClick={() => exportToExcel(filtered)}
+            className="border-slate-300 text-slate-600"
+          >
+            Xuất Excel
+          </Button>
+        </div>
       </div>
+
+      {/* New form inline */}
+      {!readOnly && showNewForm && (
+        <EquipmentRow
+          key="__new__"
+          eq={EMPTY_EQ()}
+          isNew
+          defaultOpen
+          onSave={(eq) => { onSave(eq); setShowNewForm(false) }}
+          onDelete={() => {}}
+        />
+      )}
 
       {/* Equipment list */}
       <div className="space-y-2">
@@ -164,21 +187,24 @@ const paginatedEquipment = useMemo(() => {
           </div>
         )}
 
-        {filtered.map(eq => (
+        {paginated.map(eq => (
           <EquipmentRow key={eq.id} eq={eq} onSave={onSave} onDelete={onDelete} readOnly={readOnly} />
         ))}
-        
-        {/* "Add new" accordion always at bottom - Restricted by role */}
-        {!readOnly && (
-          <EquipmentRow
-            key="__new__"
-            eq={EMPTY_EQ()}
-            isNew
-            onSave={onSave}
-            onDelete={() => {}}
-          />
-        )}
       </div>
+
+      {/* Pagination */}
+      {filtered.length > PAGE_SIZE && (
+        <div className="flex justify-center pt-2">
+          <Pagination
+            current={page}
+            pageSize={PAGE_SIZE}
+            total={filtered.length}
+            onChange={setPage}
+            showSizeChanger={false}
+            showTotal={(total, range) => `${range[0]}-${range[1]} / ${total} hồ sơ`}
+          />
+        </div>
+      )}
     </div>
   )
 }
