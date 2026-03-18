@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Input, Select, Button, Space } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import { Input, Select, Button, Space, Pagination } from 'antd'
 import { Search, X, Settings2, CheckCircle2, AlertCircle, XCircle, Download } from 'lucide-react'
 import type { Equipment, User } from '../types'
 import { exportToExcel } from '../utils/excelExport'
@@ -30,6 +30,8 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
   const [fLoc, setFLoc] = useState<string | undefined>()
   const [fType, setFType] = useState<string | undefined>()
   const [fStatus, setFStatus] = useState<string | undefined>()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const filtered = useMemo(
     () =>
@@ -48,6 +50,14 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
       }),
     [equipment, q, fLoc, fType, fStatus]
   )
+
+useEffect(() => {
+  setCurrentPage(1);
+}, [q, fLoc, fType, fStatus]);
+const paginatedEquipment = useMemo(() => {
+  const startIndex = (currentPage - 1) * pageSize;
+  return filtered.slice(startIndex, startIndex + pageSize);
+}, [filtered, currentPage, pageSize]); // Đầy đủ dependency
 
   const stats = {
     total: equipment.length,
@@ -154,20 +164,40 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
           </div>
         )}
 
-        {filtered.map(eq => (
+        {/* 5. Đổi `filtered.map` thành `paginatedEquipment.map` */}
+        {paginatedEquipment.map(eq => (
           <EquipmentRow key={eq.id} eq={eq} onSave={onSave} onDelete={onDelete} readOnly={readOnly} />
         ))}
         
-        {/* "Add new" accordion always at bottom - Restricted by role */}
+        {/* Accordion thêm mới */}
         {!readOnly && (
-          <EquipmentRow
-            key="__new__"
-            eq={EMPTY_EQ()}
-            isNew
-            onSave={onSave}
-            onDelete={() => {}}
-          />
+          <EquipmentRow key="__new__" eq={EMPTY_EQ()} isNew onSave={onSave} onDelete={() => {}} />
         )}
+
+        {/* 6. Thêm Component Phân trang của Ant Design */}
+        {filtered.length > 0 && (
+  <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 mt-2">
+    {/* Hiển thị thông số phụ bên trái (tùy chọn) */}
+    <div className="text-slate-500 text-sm">
+      Hiển thị {paginatedEquipment.length} / {filtered.length} thiết bị
+    </div>
+
+    <Pagination 
+      current={currentPage} 
+      total={filtered.length} 
+      pageSize={pageSize}
+      showSizeChanger
+      pageSizeOptions={['10', '20', '50', '100']}
+      // Thêm dòng này để hiển thị tổng quát
+      showTotal={(total) => `Tổng cộng ${total} mục`}
+      onChange={(page, size) => {
+        setCurrentPage(page);
+        setPageSize(size);
+      }}
+      size="small" // Giúp giao diện gọn hơn trên mobile
+    />
+  </div>
+)}
       </div>
     </div>
   )

@@ -40,13 +40,13 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
     appmodel: data.appliedModelName ?? data.appmodel ?? '',
     opcond: (data.operatingConditions ?? data.opcond ?? 'Good') as any,
     ctrlnum: data.controlNumber ?? data.ctrlnum ?? '',
-    eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? 'Other',
+    eqtype: data.equipmentTitle ?? data.eqtype ?? 'Other',
     location: data.installationLocation ?? data.location ?? '',
     person: data.responsiblePerson ?? data.person ?? '',
     instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : data.instdate ?? '',
     value: data.equipmentPrice != null ? String(data.equipmentPrice) : data.value ?? '',
     mfgname: data.manufacturerName ?? data.mfgname ?? '',
-    eqtitle: data.equipmentTitle ?? data.eqtitle ?? '',
+    eqtitle: data.manufacturerEquipmentTitle ?? data.eqtitle ?? '',
     model: data.manufacturerModel ?? data.model ?? '',
     serial: data.serialNo ?? data.serial ?? '',
     power: data.power ?? data.power ?? '',
@@ -118,7 +118,7 @@ function buildDetailFormData(eq: Equipment, id: string): FormData {
   formData.append('AppliedModelName', eq.appmodel || '');
   formData.append('OperatingConditions', eq.opcond || 'Good');
   formData.append('ControlNumber', eq.ctrlnum || '');
-  formData.append('EquipmentTitle', eq.eqtitle || '');
+  formData.append('EquipmentTitle', eq.eqtype || '');
   formData.append('EquipmentPrice', eq.value || '');
   formData.append('InstallationLocation', eq.location || '');
   if (eq.instdate) formData.append('DateOfInstallation', eq.instdate);
@@ -130,7 +130,7 @@ function buildDetailFormData(eq: Equipment, id: string): FormData {
   if (eq.mfgdate) formData.append('DateOfManufacture', eq.mfgdate);
   formData.append('Weight', eq.weight || '');
   formData.append('Size', eq.size || '');
-  formData.append('ManufacturerEquipmentTitle', eq.eqtype || '');
+  formData.append('ManufacturerEquipmentTitle', eq.eqtitle || '');
 
 // --- LOGIC XỬ LÝ ẢNH (BẢN FIX TRIỆT ĐỂ) ---
 // KIỂM TRA QUAN TRỌNG: Log xem metadata có tồn tại không
@@ -208,13 +208,17 @@ export function useEquipmentStore() {
 
     const fetchEquipment = async () => {
       try {
-        const res = await api.get('/Equipment')
+        const timestamp = new Date().getTime();
+        const res = await api.get(`/Equipment?t=${timestamp}`); 
+        
         let list: any[] = []
         if (Array.isArray(res.data)) list = res.data
         else if (Array.isArray((res.data as any)?.data)) list = (res.data as any).data
         else if (Array.isArray((res.data as any)?.items)) list = (res.data as any).items
 
         const normalized = list.map(item => mapApiToEquipment(item))
+        
+        // Sửa lại logic ghi đè: Chỉ ghi đè nếu API thực sự trả về data
         if (normalized.length > 0) {
           setEquipment(normalized)
           localStorage.setItem('vt_equipment_v3', JSON.stringify(normalized))
@@ -250,63 +254,74 @@ export function useEquipmentStore() {
   }, [])
 
 const saveEquipment = useCallback(async (eq: Equipment) => {
-  try {
-    Swal.showLoading();
-    const isUpdate = Boolean(eq.id && !eq.id.includes('-'));
-    let response;
+    try {
+      Swal.showLoading();
+      
+      // FIX 1: Xác định isUpdate chặt chẽ hơn (bỏ qua id là '0', rỗng, hoặc có dấu '-')
+      const isUpdate = Boolean(eq.id && !String(eq.id).includes('-') && String(eq.id) !== '0');
+      let response;
 
-    // Phục hồi metadata
-    const originalRecord = equipment.find(e => String(e.id) === String(eq.id));
-    if (originalRecord && !(eq as any)._serverImages) {
-      (eq as any)._serverImages = (originalRecord as any)._serverImages;
-    }
+      // Phục hồi metadata cho ảnh
+      const originalRecord = equipment.find(e => String(e.id) === String(eq.id));
+      if (originalRecord && !(eq as any)._serverImages) {
+        (eq as any)._serverImages = (originalRecord as any)._serverImages;
+      }
 
-    if (isUpdate) {
-      const detailFormData = buildDetailFormData(eq, eq.id);
-      response = await api.put(`/Detail/update-full`, detailFormData);
-    } else {
-      const createFormData = buildDetailFormData(eq, '0');
-      response = await api.post('/Equipment', createFormData);
-    }
-
-    // --- PHẦN FIX: ĐẢM BẢO LOAD LẠI BẢNG ---
-    
-    // 1. Lấy dữ liệu thực tế từ Server trả về (Thường nằm trong response.data hoặc response.data.data)
-    const rawData = response.data?.data || response.data;
-    const updatedRecord = mapApiToEquipment(rawData);
-
-    // 2. Cập nhật State một cách tuyệt đối
-    setEquipment(prev => {
-      let next;
+      // Gọi API tương ứng
       if (isUpdate) {
-        // Thay thế bản ghi cũ dựa trên ID
-        next = prev.map(e => String(e.id) === String(updatedRecord.id) ? updatedRecord : e);
+        const detailFormData = buildDetailFormData(eq, eq.id);
+        response = await api.put(`/Detail/update-full`, detailFormData);
       } else {
-        // Thêm mới vào đầu danh sách (Spread giúp React nhận diện mảng mới hoàn toàn)
-        next = [updatedRecord, ...prev];
+        const createFormData = buildDetailFormData(eq, '0');
+        response = await api.post('/Equipment', createFormData);
       }
       
-      // 3. Đồng bộ bộ nhớ đệm
-      localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
-      return [...next]; // Spread một lần nữa để chắc chắn địa chỉ mảng thay đổi
-    });
+      // Kiểm tra dữ liệu trả về từ Server
+      const rawData = response.data?.data || response.data;
+      if (!rawData) throw new Error("Server không trả về dữ liệu sau khi lưu.");
 
-    Swal.fire({
-      icon: 'success',
-      title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
-      text: `Thiết bị ${updatedRecord.eqtitle} đã được cập nhật.`,
-      timer: 2000,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
+      // Chuẩn hóa dữ liệu thật từ Server
+      const updatedRecord = mapApiToEquipment(rawData);
 
-    return updatedRecord;
+      // --- FIX 2: CẬP NHẬT STATE THÔNG MINH (KHÔNG CẦN F5) ---
+      setEquipment(prev => {
+        const nextList = [...prev];
+        // Tìm xem bản ghi (với ID lúc đang thao tác) đã nằm sẵn trong danh sách chưa
+        const existingIndex = nextList.findIndex(item => String(item.id) === String(eq.id));
 
-  } catch (error: any) {
-     // ... logic catch lỗi cũ của bạn giữ nguyên
-  }
-}, [equipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
+        if (existingIndex >= 0) {
+          // Nếu ĐÃ CÓ (Đang Edit hoặc đang Lưu một dòng tạm thời có ID chứa '-'):
+          // Ta GHI ĐÈ dòng cũ đó bằng dữ liệu chuẩn xịn (ID mới) từ Server
+          nextList[existingIndex] = updatedRecord;
+        } else {
+          // Nếu CHƯA CÓ (Thêm mới hoàn toàn từ một popup/form ngoài bảng):
+          // Thêm dữ liệu vào ĐẦU danh sách
+          nextList.unshift(updatedRecord);
+        }
+        
+        // Lưu ngay xuống LocalStorage
+        localStorage.setItem('vt_equipment_v3', JSON.stringify(nextList));
+        return nextList; 
+      });
+
+      Swal.fire({
+        icon: 'success',
+        title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
+        text: `Thiết bị ${updatedRecord.eqtitle} đã được lưu.`,
+        timer: 2500,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+
+      return updatedRecord;
+
+    } catch (error: any) {
+      console.error("Save error:", error);
+      Swal.fire('Lỗi!', error.response?.data?.message || 'Không thể lưu dữ liệu', 'error');
+      return null;
+    }
+  }, [equipment]);
 
   const deleteEquipment = useCallback(async (id: string) => {
   // Nếu là ID tạm (có dấu gạch ngang), chỉ cần xóa ở Local
@@ -345,7 +360,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
       Swal.fire({
         title: 'Đã xóa!',
         icon: 'success',
-        timer: 1500,
+        timer: 2500,
         showConfirmButton: false,
         toast: true,
         position: 'top-end'
