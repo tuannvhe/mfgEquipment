@@ -29,7 +29,9 @@ const isDataURL = (v: any): v is string => typeof v === 'string' && v.startsWith
 function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
   const baseUrl = api.defaults.baseURL?.replace(/\/api\/?$/, '') || '';
   const formatUrl = (path: string) => {
-    if (!path || path.startsWith('http') || path.startsWith('data:')) return path;
+    if (!path) return path;
+    // Nếu đã là URL đầy đủ (Cloudinary, http, https, data:) thì giữ nguyên
+    if (path.startsWith('http') || path.startsWith('https') || path.startsWith('data:')) return path;
     // Đảm bảo không bị double slash
     const cleanPath = path.startsWith('/') ? path.slice(1) : path;
     return `${baseUrl}/${cleanPath}`;
@@ -40,14 +42,14 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
     appmodel: data.appliedModelName ?? data.appmodel ?? '',
     opcond: (data.operatingConditions ?? data.opcond ?? 'Good') as any,
     ctrlnum: data.controlNumber ?? data.ctrlnum ?? '',
-    eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? 'Other',
+    eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? '',
     location: data.installationLocation ?? data.location ?? '',
     person: data.responsiblePerson ?? data.person ?? '',
     instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : data.instdate ?? '',
     value: data.equipmentPrice != null ? String(data.equipmentPrice) : data.value ?? '',
     mfgname: data.manufacturerName ?? data.mfgname ?? '',
     eqtitle: data.equipmentTitle ?? data.eqtitle ?? '',
-    model: data.manufacturerModel ?? data.model ?? '',
+    model: data.model ?? data.manufacturerModel ?? '',
     serial: data.serialNo ?? data.serial ?? '',
     power: data.power ?? data.power ?? '',
     mfgdate: data.dateOfManufacture ? data.dateOfManufacture.split('T')[0] : data.mfgdate ?? '',
@@ -56,23 +58,51 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
     makeraddr: data.manufacturerAddr ?? data.makeraddr ?? '',
     photo1: '',
     photo2: '',
-    periodicItems: data.periodicItems ?? data.PeriodicInspections ?? [],
-    inspections: (data.periodicInspections || data.inspections || []).map((item: any) => ({
-      id: String(item.id || uid()),
-      date: item.inspectionDate ? item.inspectionDate.split('T')[0] : (item.dateOfInspection ? item.dateOfInspection.split('T')[0] : (item.date || '')),
-      detail: item.description || item.periodicItems || item.detail || '',
-      failure: item.failureStatus || item.failure || '',
-      replacement: item.replacementPart || item.replacement || '',
-      inspector: item.inspectorName || item.inspector || '',
-      remarks: item.remarks || ''
-    })),
-    spareParts: (data.spareParts || []).map((item: any) => ({
-      id: String(item.id || uid()),
-      name: item.partName || item.name || '',
-      partnum: item.partNumber || item.partnum || '',
-      spec: item.specification || item.spec || '',
-      qty: item.quantity || item.qty || 0
-    })),
+    // periodicInspections -> periodicItems, lọc bỏ row toàn null
+    periodicItems: (data.periodicInspections || data.periodicItems || [])
+      .filter((item: any) => item.inspectionInterval || item.periodicItems || item.dateOfInspection || item.inspectionDetails || item.interval || item.content)
+      .map((item: any) => ({
+        id: String(item.id || uid()),
+        interval: item.inspectionInterval || item.interval || '',
+        item: item.periodicItems || item.item || '',
+        inspdate: item.dateOfInspection ? item.dateOfInspection.split('T')[0] : (item.inspdate || ''),
+        content: item.inspectionDetails || item.content || '',
+      })),
+    // inspections: lấy date/detail từ periodicInspections, failure/replacement/inspector/remarks từ spareParts (cùng index)
+    inspections: (() => {
+      const periArr: any[] = data.periodicInspections || [];
+      const spareArr: any[] = data.spareParts || [];
+      const len = Math.max(periArr.length, spareArr.length);
+      const result: any[] = [];
+      for (let i = 0; i < len; i++) {
+        const p = periArr[i] || {};
+        const s = spareArr[i] || {};
+        const date = p.dateOfInspection ? p.dateOfInspection.split('T')[0] : '';
+        const detail = p.inspectionDetails || '';
+        const failure = s.failureHistory || '';
+        const replacement = s.replacementParts || '';
+        const inspector = s.inspector || '';
+        const remarks = s.remarks || '';
+        if (date || detail || failure || replacement || inspector || remarks) {
+          result.push({ id: String(p.id || s.id || uid()), date, detail, failure, replacement, inspector, remarks });
+        }
+      }
+      return result;
+    })(),
+    // spareParts: giữ row nếu có bất kỳ field nào có giá trị
+    spareParts: (data.spareParts || [])
+      .filter((item: any) => item.partName || item.partNumber || item.specification || item.quantity || item.failureHistory || item.replacementParts || item.inspector || item.remarks)
+      .map((item: any) => ({
+        id: String(item.id || uid()),
+        name: item.partName || item.name || '',
+        partnum: item.partNumber || item.partnum || '',
+        spec: item.specification || item.spec || '',
+        qty: String(item.quantity ?? item.qty ?? ''),
+        replacement: item.replacementParts || item.replacement || '',
+        failure: item.failureHistory || item.failure || '',
+        inspector: item.inspector || '',
+        remarks: item.remarks || '',
+      })),
   };
 
  const serverMeta: any[] = [];
@@ -113,24 +143,24 @@ const toValidIntId = (id: any) => {
 function buildDetailFormData(eq: Equipment, id: string): FormData {
   const formData = new FormData();
   const vId = toValidIntId(id);
-  formData.append('Id', vId);
-  formData.append('EquipmentId', vId);
+  // EquipmentId chỉ cần cho update (vId > 0)
+  if (Number(vId) > 0) formData.append('EquipmentId', vId);
   formData.append('AppliedModelName', eq.appmodel || '');
   formData.append('OperatingConditions', eq.opcond || 'Good');
   formData.append('ControlNumber', eq.ctrlnum || '');
   formData.append('EquipmentTitle', eq.eqtitle || '');
-  formData.append('EquipmentPrice', eq.value || '');
+  formData.append('EquipmentPrice', eq.value || '0');
   formData.append('InstallationLocation', eq.location || '');
-  if (eq.instdate) formData.append('DateOfInstallation', eq.instdate);
-  if (eq.person) formData.append('ResponsiblePerson', eq.person);
+  formData.append('DateOfInstallation', eq.instdate || '');
+  formData.append('ResponsiblePerson', eq.person || '');
   formData.append('ManufacturerName', eq.mfgname || '');
+  formData.append('ManufacturerEquipmentTitle', eq.eqtype || '');
   formData.append('ManufacturerModel', eq.model || '');
   formData.append('SerialNo', eq.serial || '');
-  formData.append('Power', eq.power || '');
-  if (eq.mfgdate) formData.append('DateOfManufacture', eq.mfgdate);
+  formData.append('DateOfManufacture', eq.mfgdate || '');
   formData.append('Weight', eq.weight || '');
+  formData.append('Power', eq.power || '');
   formData.append('Size', eq.size || '');
-  formData.append('ManufacturerEquipmentTitle', eq.eqtype || '');
 
 // --- LOGIC XỬ LÝ ẢNH (BẢN FIX TRIỆT ĐỂ) ---
 // KIỂM TRA QUAN TRỌNG: Log xem metadata có tồn tại không
@@ -166,23 +196,28 @@ const serverImages = (eq as any)._serverImages || [];
   processPhoto(eq.photo1, false); // Xử lý ảnh Trái (Type = false)
   processPhoto(eq.photo2, true);  // Xử lý ảnh Phải (Type = true)
 
-  // Xử lý bảng con (giữ nguyên logic của bạn)
-  (eq.inspections || []).forEach((item, idx) => {
-    formData.append(`PeriodicInspections[${idx}].Id`, toValidIntId(item.id));
-    formData.append(`PeriodicInspections[${idx}].InspectionDate`, item.date || '');
-    formData.append(`PeriodicInspections[${idx}].Description`, item.detail || '');
-    formData.append(`PeriodicInspections[${idx}].FailureStatus`, item.failure || '');
-    formData.append(`PeriodicInspections[${idx}].ReplacementPart`, item.replacement || '');
-    formData.append(`PeriodicInspections[${idx}].InspectorName`, item.inspector || '');
-    formData.append(`PeriodicInspections[${idx}].Remarks`, item.remarks || '');
+  // PeriodicInspections - indexed form fields (ASP.NET [FromForm] binding)
+  (eq.periodicItems || []).forEach((item, idx) => {
+    const iid = toValidIntId(item.id);
+    formData.append(`PeriodicInspections[${idx}][id]`, iid);
+    formData.append(`PeriodicInspections[${idx}][inspectionInterval]`, item.interval || '');
+    formData.append(`PeriodicInspections[${idx}][periodicItems]`, item.item || '');
+    if (item.inspdate) formData.append(`PeriodicInspections[${idx}][dateOfInspection]`, new Date(item.inspdate).toISOString());
+    formData.append(`PeriodicInspections[${idx}][inspectionDetails]`, item.content || '');
   });
 
+  // SpareParts - indexed form fields (ASP.NET [FromForm] binding)
   (eq.spareParts || []).forEach((item, idx) => {
-    formData.append(`SpareParts[${idx}].Id`, toValidIntId(item.id));
-    formData.append(`SpareParts[${idx}].PartName`, item.name || '');
-    formData.append(`SpareParts[${idx}].PartNumber`, item.partnum || '');
-    formData.append(`SpareParts[${idx}].Specification`, item.spec || '');
-    formData.append(`SpareParts[${idx}].Quantity`, String(item.qty || 0));
+    const sid = toValidIntId(item.id);
+    formData.append(`SpareParts[${idx}][id]`, sid);
+    formData.append(`SpareParts[${idx}][partName]`, item.name || '');
+    formData.append(`SpareParts[${idx}][partNumber]`, item.partnum || '');
+    formData.append(`SpareParts[${idx}][specification]`, item.spec || '');
+    formData.append(`SpareParts[${idx}][quantity]`, String(Number(item.qty) || 0));
+    formData.append(`SpareParts[${idx}][replacementParts]`, item.replacement || '');
+    formData.append(`SpareParts[${idx}][failureHistory]`, item.failure || '');
+    formData.append(`SpareParts[${idx}][inspector]`, item.inspector || '');
+    formData.append(`SpareParts[${idx}][remarks]`, item.remarks || '');
   });
 
   return formData;
@@ -263,10 +298,14 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
 
     if (isUpdate) {
       const detailFormData = buildDetailFormData(eq, eq.id);
-      response = await api.put(`/Detail/update-full`, detailFormData);
+      response = await api.put(`/Detail/update-full`, detailFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
     } else {
       const createFormData = buildDetailFormData(eq, '0');
-      response = await api.post('/Equipment', createFormData);
+      response = await api.post('/Equipment', createFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
     }
 
     // --- PHẦN FIX: ĐẢM BẢO LOAD LẠI BẢNG ---

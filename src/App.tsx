@@ -5,7 +5,6 @@ import {
   ClipboardCheck, 
   Wrench, 
   AlertTriangle, 
-  FileSpreadsheet, 
   User as UserIcon, 
   LogOut,
   ChevronRight,
@@ -14,8 +13,6 @@ import {
 } from 'lucide-react'
 import { useEquipmentStore } from './store/useStore'
 import EquipmentListPage from './pages/EquipmentListPage'
-import InspectionPage    from './pages/InspectionPage'
-import SparePartsPage    from './pages/SparePartsPage'
 import FailurePage       from './pages/FailurePage'
 import LoginPage         from './pages/LoginPage'
 import { authService }   from './utils/authService'
@@ -38,8 +35,6 @@ const THEME_COLORS = {
 
 const NAV: { key: ViewKey; label: string; sub: string; Icon: any; roles?: string[] }[] = [
   { key: 'list',  label: 'Danh sách thiết bị',   sub: 'Equipment List', Icon: Settings2, roles: ['admin', 'staff', 'user'] },
-  { key: 'insp',  label: 'Kiểm tra bảo trì',     sub: 'Inspection',     Icon: ClipboardCheck, roles: ['admin', 'staff'] },
-  { key: 'spare', label: 'Quản lý phụ tùng',     sub: 'Spare Parts',    Icon: Wrench, roles: ['admin', 'staff'] },
   { key: 'fail',  label: 'Báo cáo sự cố',       sub: 'Failure Logs',    Icon: AlertTriangle, roles: ['admin', 'staff', 'user'] },
 ]
 
@@ -267,8 +262,6 @@ function AppInner() {
         <Content style={{ padding: '15px 20px', overflowY: 'auto' }}>
           <div className="fade-in">
             {view === 'list'  && <EquipmentListPage equipment={equipment} onSave={handleSave} onDelete={handleDelete} user={user} />}
-            {view === 'insp'  && <InspectionPage    equipment={equipment} user={user} />}
-            {view === 'spare' && <SparePartsPage     equipment={equipment} user={user} />}
             {view === 'fail'  && <FailurePage        equipment={equipment} user={user} />}
           </div>
         </Content>

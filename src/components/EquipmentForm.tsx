@@ -10,7 +10,6 @@ import { useReactToPrint } from 'react-to-print'
 import dayjs from 'dayjs'
 import api from '../utils/api'
 
-const EQ_TYPES = ['Winding', 'Riveting Assembly', 'Capacitor Assembly', 'Other']
 const LOCATIONS = ['Bắc Giang #1', 'Bắc Giang #2', 'Bắc Ninh', 'Hà Nam', 'Hưng Yên']
 
 interface Props {
@@ -82,6 +81,14 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     api.get(`/Detail/${initialData.id}`)
       .then(res => {
         const data = res.data
+        // Build _serverImages metadata from response
+        const rawList = data.images || data.mainImages || data.equipmentImages || []
+        const serverImages = Array.isArray(rawList)
+          ? rawList.map((img: any) => ({
+              id: img.id,
+              type: img.imageType === true || img.type === true || img.imageType === 1,
+            }))
+          : []
         setForm(prev => ({
           ...prev,
           appmodel: data.appliedModelName ?? data.appmodel ?? prev.appmodel,
@@ -93,18 +100,78 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
           instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : prev.instdate,
           person: data.responsiblePerson ?? data.person ?? prev.person,
           mfgname: data.manufacturerName ?? data.mfgname ?? prev.mfgname,
-          model: data.manufacturerModel ?? data.model ?? prev.model,
+          model: data.model ?? data.manufacturerModel ?? prev.model,
           serial: data.serialNo ?? data.serial ?? prev.serial,
           power: data.power ?? prev.power,
           mfgdate: data.dateOfManufacture ? data.dateOfManufacture.split('T')[0] : prev.mfgdate,
           weight: data.weight ?? prev.weight,
           size: data.size ?? prev.size,
           eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? prev.eqtype,
-          photo1: data.mainImagePath?.[0] || (data.mainImages?.find((i:any)=>i.type===false)?.path) || prev.photo1,
-          photo2: data.mainImagePath?.[1] || (data.mainImages?.find((i:any)=>i.type===true)?.path) || prev.photo2,
-          periodicItems: data.periodicItems ?? data.periodicInspections ?? prev.periodicItems,
-          inspections: data.inspections ?? prev.inspections,
-          spareParts: data.spareParts ?? prev.spareParts,
+          _serverImages: serverImages.length > 0 ? serverImages : (prev as any)._serverImages,
+          photo1: (() => {
+            const imgs = data.images || data.mainImages || [];
+            const left = imgs.find((i: any) => i.imageType === false || i.type === false || i.imageType === 0);
+            return left?.imagePath || left?.path || left?.url || prev.photo1;
+          })(),
+          photo2: (() => {
+            const imgs = data.images || data.mainImages || [];
+            const right = imgs.find((i: any) => i.imageType === true || i.type === true || i.imageType === 1);
+            return right?.imagePath || right?.path || right?.url || prev.photo2;
+          })(),
+          periodicItems: (data.periodicInspections || data.periodicItems || [])
+            .filter((item: any) => item.inspectionInterval || item.periodicItems || item.dateOfInspection || item.inspectionDetails)
+            .map((item: any) => ({
+              id: String(item.id || `p_${Date.now()}`),
+              interval: item.inspectionInterval || item.interval || '',
+              item: item.periodicItems || item.item || '',
+              inspdate: item.dateOfInspection ? item.dateOfInspection.split('T')[0] : (item.inspdate || ''),
+              content: item.inspectionDetails || item.content || '',
+            })),
+          inspections: (() => {
+            if (Array.isArray(data.inspections) && data.inspections.length > 0) {
+              return data.inspections.map((item: any) => ({
+                id: String(item.id || `i_${Date.now()}`),
+                date: item.inspectionDate ? item.inspectionDate.split('T')[0] : (item.date || ''),
+                detail: item.description || item.inspectionDetails || item.detail || '',
+                failure: item.failureStatus || item.failureHistory || item.failure || '',
+                replacement: item.replacementPart || item.replacementParts || item.replacement || '',
+                inspector: item.inspectorName || item.inspector || '',
+                remarks: item.remarks || '',
+              }));
+            }
+            // Fallback: ghép từ periodicInspections + spareParts (backend gộp chung)
+            const periArr: any[] = data.periodicInspections || [];
+            const spareArr: any[] = data.spareParts || [];
+            const len = Math.max(periArr.length, spareArr.length);
+            const result: any[] = [];
+            for (let i = 0; i < len; i++) {
+              const p = periArr[i] || {};
+              const s = spareArr[i] || {};
+              const date = p.dateOfInspection ? p.dateOfInspection.split('T')[0] : '';
+              const detail = p.inspectionDetails || '';
+              const failure = s.failureHistory || '';
+              const replacement = s.replacementParts || '';
+              const inspector = s.inspector || '';
+              const remarks = s.remarks || '';
+              if (date || detail || failure || replacement || inspector || remarks) {
+                result.push({ id: String(p.id || s.id || `i_${Date.now()}_${i}`), date, detail, failure, replacement, inspector, remarks });
+              }
+            }
+            return result;
+          })(),
+          spareParts: (data.spareParts || [])
+            .filter((item: any) => item.partName || item.partNumber || item.specification || item.quantity || item.failureHistory || item.replacementParts || item.inspector || item.remarks)
+            .map((item: any) => ({
+              id: String(item.id || `s_${Date.now()}`),
+              name: item.partName || item.name || '',
+              partnum: item.partNumber || item.partnum || '',
+              spec: item.specification || item.spec || '',
+              qty: String(item.quantity ?? item.qty ?? ''),
+              replacement: item.replacementParts || item.replacement || '',
+              failure: item.failureHistory || item.failure || '',
+              inspector: item.inspector || '',
+              remarks: item.remarks || '',
+            })),
         }))
       })
       .catch(err => {
@@ -131,11 +198,15 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
       return
     }
     
-    // Clean empty arrays
+    // Clean empty arrays - giữ row nếu có bất kỳ field nào có giá trị
     const cleanForm = { ...form };
-    cleanForm.inspections = (cleanForm.inspections || []).filter(i => i.date || i.detail || i.failure || i.remarks || i.replacement || i.inspector);
-    cleanForm.periodicItems = (cleanForm.periodicItems || []).filter(i => i.interval || i.item || i.inspdate || i.content);
-    cleanForm.spareParts = (cleanForm.spareParts || []).filter(i => i.name || i.partnum || i.qty || i.spec);
+    cleanForm.periodicItems = (cleanForm.periodicItems || []).filter(i => 
+      i.interval || i.item || i.inspdate || i.content
+    );
+    cleanForm.spareParts = (cleanForm.spareParts || []).filter(i => 
+      i.name || i.partnum || i.qty || i.spec || i.failure || i.replacement || i.inspector || i.remarks
+    );
+    cleanForm.inspections = [];
     
     onSave(cleanForm)
     if (isNew) setForm({ ...initialData })
@@ -152,23 +223,29 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   }
 
   // Spare Part Helpers
-  const getSPart = (i: number) => form.spareParts?.[i] || { id: `s_${uid()}`, name: '', partnum: '', spec: '', qty: '' }
+  const emptySPart = () => ({ id: `s_${uid()}`, name: '', partnum: '', spec: '', qty: '', replacement: '', failure: '', inspector: '', remarks: '' })
+  const getSPart = (i: number) => form.spareParts?.[i] || emptySPart()
   const setSPart = (i: number, key: string, val: string) => {
     const arr = [...(form.spareParts || [])]
-    while (arr.length <= i) arr.push({ id: `s_${uid()}`, name: '', partnum: '', spec: '', qty: '' })
+    while (arr.length <= i) arr.push(emptySPart())
     arr[i] = { ...arr[i], [key]: val }
     set('spareParts', arr)
   }
 
-  // Inspection Helpers
-  const getInsp = (i: number) => form.inspections?.[i] || { id: `i_${uid()}`, date: '', detail: '', failure: '', replacement: '', inspector: '', remarks: '' }
-  const setInsp = (i: number, key: string, val: string) => {
-    const arr = [...(form.inspections || [])]
-    while (arr.length <= i) arr.push({ id: `i_${uid()}`, date: '', detail: '', failure: '', replacement: '', inspector: '', remarks: '' })
-    arr[i] = { ...arr[i], [key]: val }
-    set('inspections', arr)
+  // Inspection Helpers - chỉ đọc/ghi spareParts (failure/replacement/inspector/remarks)
+  const getInsp = (i: number) => {
+    const s = form.spareParts?.[i]
+    return {
+      id: s?.id || `i_${uid()}`,
+      failure: s?.failure || '',
+      replacement: s?.replacement || '',
+      inspector: s?.inspector || '',
+      remarks: s?.remarks || '',
+    }
   }
-
+  const setInsp = (i: number, key: string, val: string) => {
+    setSPart(i, key, val)
+  }
   // Image Upload Handler
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo1' | 'photo2') => {
     const file = e.target.files?.[0]
@@ -183,9 +260,9 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   // Row Management Helpers
   const commonExtra = Math.max(extraP, extraS)
   const commonLength = Math.max(form.periodicItems?.length || 0, form.spareParts?.length || 0)
-  const pRowCount = Math.max(4 + commonExtra, commonLength)
-  const sRowCount = Math.max(4 + commonExtra, commonLength)
-  const botRowCount = Math.max(4 + extraBot, form.inspections?.length || 0)
+  const pRowCount = Math.max(1 + commonExtra, commonLength)
+  const sRowCount = Math.max(1 + commonExtra, commonLength)
+  const botRowCount = Math.max(1 + extraBot, commonLength)
 
   const clearPRow = (i: number) => {
     const newP = [...(form.periodicItems || [])]
@@ -193,7 +270,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     set('periodicItems', newP)
   }
   const deletePRow = (i: number) => {
-    if (pRowCount <= 4) return
+    if (pRowCount <= 1) return
     const newP = [...(form.periodicItems || [])]
     if (newP.length > i) newP.splice(i, 1)
     set('periodicItems', newP)
@@ -208,11 +285,11 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
 
   const clearSRow = (i: number) => {
     const newS = [...(form.spareParts || [])]
-    if (newS[i]) newS[i] = { id: newS[i].id, name: '', partnum: '', spec: '', qty: '' }
+    if (newS[i]) newS[i] = { id: newS[i].id, name: '', partnum: '', spec: '', qty: '', replacement: '', failure: '', inspector: '', remarks: '' }
     set('spareParts', newS)
   }
   const deleteSRow = (i: number) => {
-    if (sRowCount <= 4) return
+    if (sRowCount <= 1) return
     const newS = [...(form.spareParts || [])]
     if (newS.length > i) newS.splice(i, 1)
     set('spareParts', newS)
@@ -226,16 +303,23 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   }
 
   const clearBotRow = (i: number) => {
-    const newI = [...(form.inspections || [])]
-    if (newI[i]) newI[i] = { id: newI[i].id, date: '', detail: '', failure: '', replacement: '', inspector: '', remarks: '' }
-    set('inspections', newI)
+    // Xóa trắng date/detail ở periodicItems, failure/replacement/inspector/remarks ở spareParts
+    const newP = [...(form.periodicItems || [])]
+    if (newP[i]) newP[i] = { ...newP[i], inspdate: '', content: '' }
+    set('periodicItems', newP)
+    const newS = [...(form.spareParts || [])]
+    if (newS[i]) newS[i] = { ...newS[i], failure: '', replacement: '', inspector: '', remarks: '' }
+    set('spareParts', newS)
   }
 
   const deleteBotLRow = (i: number) => {
-    if (botRowCount <= 4) return
-    const newI = [...(form.inspections || [])]
-    if (newI.length > i) newI.splice(i, 1)
-    set('inspections', newI)
+    if (botRowCount <= 1) return
+    const newP = [...(form.periodicItems || [])]
+    if (newP.length > i) newP.splice(i, 1)
+    set('periodicItems', newP)
+    const newS = [...(form.spareParts || [])]
+    if (newS.length > i) newS.splice(i, 1)
+    set('spareParts', newS)
     if (extraBot > 0) setExtraBot(b => b - 1)
   }
 
@@ -375,8 +459,8 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
 
               {/* === ROW 5 === */}
               <tr>
-                <TdLabel>Equipment Type<br/>Phân loại thiết bị</TdLabel>
-                <TdValue><ExcelSelect value={form.eqtype} onChange={(v: string) => set('eqtype', v)} options={EQ_TYPES} className={inputClass} /></TdValue>
+                <TdLabel>Equipment Title<br/>Tên gọi thiết bị</TdLabel>
+                <TdValue><ExcelInput value={form.eqtype} onChange={(v: string) => set('eqtype', v)} placeholder="Ví dụ: Winding" className={inputClass} /></TdValue>
                 <TdLabel>Installation Location<br/>Địa điểm lắp đặt</TdLabel>
                 <TdValue><ExcelSelect value={form.location} onChange={(v: string) => set('location', v)} options={LOCATIONS} className={inputClass} /></TdValue>
                 <TdLabel>Serial No<br/>Số Seri</TdLabel>
@@ -463,11 +547,11 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                                   <ExcelInput value={p.interval} onChange={(v: string) => setPItem(i, 'interval', v)} className={inputClass} />
                                 </td>
                                 <td className="border-b border-black bg-white p-0 align-middle relative">
-                                  <ExcelInput value={p.content} onChange={(v: string) => setPItem(i, 'content', v)} className={`text-left ${inputClass}`} />
+                                  <ExcelInput value={p.item} onChange={(v: string) => setPItem(i, 'item', v)} className={`text-left ${inputClass}`} />
                                   {!readOnly && (
                                     <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
                                       <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearPRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
-                                      {pRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deletePRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
+                                      {pRowCount > 1 && <Tooltip title="Xóa hàng này"><button onClick={() => deletePRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
                                     </div>
                                   )}
                                 </td>
@@ -482,18 +566,18 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                             <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Inspection Details<br/>Nội dung kiểm tra / sự cố</td>
                           </tr>
                           {Array.from({ length: botRowCount }).map((_, i) => {
-                            const r = getInsp(i);
+                            const p = getPItem(i);
                             return (
                               <tr key={`botL_${i}`} className="group">
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelDatePicker value={r.date} onChange={(v: string) => setInsp(i, 'date', v)} className={inputClass} />
+                                  <ExcelDatePicker value={p.inspdate} onChange={(v: string) => setPItem(i, 'inspdate', v)} className={inputClass} />
                                 </td>
                                 <td className="border-b border-black bg-white p-0 align-middle relative">
-                                  <ExcelInput value={r.detail} onChange={(v: string) => setInsp(i, 'detail', v)} className={`text-left ${inputClass}`} />
+                                  <ExcelInput value={p.content} onChange={(v: string) => setPItem(i, 'content', v)} className={`text-left ${inputClass}`} />
                                   {!readOnly && (
                                     <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
                                       <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearBotRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
-                                      {botRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteBotLRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
+                                      {botRowCount > 1 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteBotLRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
                                     </div>
                                   )}
                                 </td>
@@ -544,7 +628,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                                   {!readOnly && (
                                     <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
                                       <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearSRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
-                                      {sRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteSRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
+                                      {sRowCount > 1 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteSRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
                                     </div>
                                   )}
                                 </td>
@@ -578,7 +662,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                                   {!readOnly && (
                                     <div className="absolute top-0 right-0 h-full hidden group-hover:flex items-center space-x-1 pr-1 bg-gradient-to-l from-white via-white to-transparent pl-4">
                                       <Tooltip title="Xóa trắng hàng này"><button onClick={() => clearBotRow(i)} className="p-1 text-slate-400 hover:text-orange-500 bg-slate-50 border border-slate-200 rounded shadow-sm"><Eraser size={12} /></button></Tooltip>
-                                      {botRowCount > 4 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteBotLRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
+                                      {botRowCount > 1 && <Tooltip title="Xóa hàng này"><button onClick={() => deleteBotLRow(i)} className="p-1 text-slate-400 hover:text-red-600 bg-red-50 border border-red-100 rounded shadow-sm"><X size={12} /></button></Tooltip>}
                                     </div>
                                   )}
                                 </td>

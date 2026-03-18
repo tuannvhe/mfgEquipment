@@ -1,5 +1,28 @@
 export type OpCond = 'Good' | 'Warning' | 'Bad'
 
+// Maps to InspectionDto (PeriodicInspections)
+export interface PeriodicItem {
+  id: string
+  interval: string    // InspectionInterval
+  item: string        // PeriodicItems
+  inspdate: string    // DateOfInspection
+  content: string     // InspectionDetails
+}
+
+// Maps to SparePartDto (SpareParts) - gộp cả spare part + failure/repair history
+export interface SparePart {
+  id: string
+  name: string        // PartName
+  partnum: string     // PartNumber
+  spec: string        // Specification
+  qty: string         // Quantity
+  replacement: string // ReplacementParts
+  failure: string     // FailureHistory
+  inspector: string   // Inspector
+  remarks: string     // Remarks
+}
+
+// Inspection chỉ dùng nội bộ FE để hiển thị bảng lịch sử KT/SC (lấy từ SparePart)
 export interface Inspection {
   id: string
   date: string
@@ -8,22 +31,6 @@ export interface Inspection {
   replacement: string
   inspector: string
   remarks: string
-}
-
-export interface SparePart {
-  id: string
-  name: string
-  partnum: string
-  spec: string
-  qty: string
-}
-
-export interface PeriodicItem {
-  id: string
-  interval: string
-  item: string
-  inspdate: string
-  content: string
 }
 
 export interface Equipment {
@@ -51,16 +58,16 @@ export interface Equipment {
   photo2?: string
   // Sub-records
   periodicItems: PeriodicItem[]
-  inspections: Inspection[]
   spareParts: SparePart[]
-  _serverImages?: { id: number | string; type: boolean }[];
+  inspections: Inspection[]   // FE-only: hiển thị bảng Date/Detail từ PeriodicInspections
+  _serverImages?: { id: number | string; type: boolean }[]
 }
 
 export interface User {
   id: string
   username: string
   name: string
-  role: 'admin' | 'user' | 'staff' // adjust roles as needed
+  role: 'admin' | 'user' | 'staff'
   avatar?: string
 }
 
@@ -69,4 +76,3 @@ export interface AuthResponse {
   refreshToken: string
   user: User
 }
-
