@@ -201,7 +201,7 @@ export function useEquipmentStore() {
   const [loading, setLoading] = useState(true)
   const loadedOnce = useRef(false)
   const fetchingId = useRef<string | null>(null);
-
+const [totalItems, setTotalItems] = useState(0);
   useEffect(() => {
     if (loadedOnce.current) return
     loadedOnce.current = true
