@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
-import { Input, Select, Button, Pagination } from 'antd'
-import { Search, X, Settings2, CheckCircle2, AlertCircle, XCircle, Download, PlusCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Input, Select, Button, Space, Pagination } from 'antd'
+import { Search, X, Settings2, CheckCircle2, AlertCircle, XCircle, Download } from 'lucide-react'
 import type { Equipment, User } from '../types'
 import { exportToExcel } from '../utils/excelExport'
 import EquipmentRow from '../components/EquipmentRow'
@@ -25,14 +25,13 @@ interface Props {
 }
 
 export default function EquipmentListPage({ equipment, onSave, onDelete, user }: Props) {
-  const readOnly = false
+  const readOnly = false // Bỏ phân quyền tạm thời: cho phép hành động thêm/sửa/xóa với mọi user
   const [q, setQ] = useState('')
   const [fLoc, setFLoc] = useState<string | undefined>()
   const [fType, setFType] = useState<string | undefined>()
   const [fStatus, setFStatus] = useState<string | undefined>()
-  const [page, setPage] = useState(1)
-  const [showNewForm, setShowNewForm] = useState(false)
-  const PAGE_SIZE = 8
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const filtered = useMemo(
     () =>
@@ -52,6 +51,14 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
     [equipment, q, fLoc, fType, fStatus]
   )
 
+useEffect(() => {
+  setCurrentPage(1);
+}, [q, fLoc, fType, fStatus]);
+const paginatedEquipment = useMemo(() => {
+  const startIndex = (currentPage - 1) * pageSize;
+  return filtered.slice(startIndex, startIndex + pageSize);
+}, [filtered, currentPage, pageSize]); // Đầy đủ dependency
+
   const stats = {
     total: equipment.length,
     good: equipment.filter(e => e.opcond === 'Good').length,
@@ -67,11 +74,6 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
   ]
 
   const hasFilter = !!(q || fLoc || fType || fStatus)
-
-  // Reset về trang 1 khi filter thay đổi
-  const handleFilterChange = (fn: () => void) => { fn(); setPage(1) }
-
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div className="space-y-2">
@@ -90,31 +92,31 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
         ))}
       </div>
 
-      {/* Filters + Add button */}
-      <div className="flex flex-wrap gap-2 items-center">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
         <Input
           prefix={<Search size={14} className="text-slate-400" />}
           placeholder="Tên, model, S/N, số kiểm soát..."
           value={q}
-          onChange={e => handleFilterChange(() => setQ(e.target.value))}
+          onChange={e => setQ(e.target.value)}
           allowClear
           size="middle"
-          className="flex-1 min-w-[200px] h-8 max-w-sm"
+          className="flex-1 min-w-[240px] h-8 max-w-sm"
         />
         <Select
           size="middle"
           placeholder="Tất cả vị trí"
           value={fLoc}
-          onChange={v => handleFilterChange(() => setFLoc(v))}
+          onChange={setFLoc}
           allowClear
-          className="min-w-[140px] h-8"
+          className="min-w-[140px] h-8 "
           options={LOCATIONS.map(l => ({ value: l, label: l }))}
         />
         <Select
           size="middle"
           placeholder="Tất cả loại"
           value={fType}
-          onChange={v => handleFilterChange(() => setFType(v))}
+          onChange={setFType}
           allowClear
           className="min-w-[160px] h-8"
           options={EQ_TYPES.map(t => ({ value: t, label: t }))}
@@ -123,7 +125,7 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
           size="middle"
           placeholder="Trạng thái"
           value={fStatus}
-          onChange={v => handleFilterChange(() => setFStatus(v))}
+          onChange={setFStatus}
           allowClear
           className="min-w-[130px] h-8"
           options={[
@@ -137,46 +139,21 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
             size="middle"
             type="text"
             icon={<X size={14} />}
-            onClick={() => handleFilterChange(() => { setQ(''); setFLoc(undefined); setFType(undefined); setFStatus(undefined) })}
+            onClick={() => { setQ(''); setFLoc(undefined); setFType(undefined); setFStatus(undefined) }}
             className="text-slate-400"
           >
             Xóa lọc
           </Button>
         )}
-        <div className="ml-auto flex gap-2">
-          {!readOnly && (
-            <Button
-              size="middle"
-              type="primary"
-              icon={<PlusCircle size={14} />}
-              onClick={() => setShowNewForm(v => !v)}
-              style={{ background: '#2d5f1b', border: 'none' }}
-            >
-              Thêm hồ sơ
-            </Button>
-          )}
-          <Button
-            size="middle"
-            icon={<Download size={14} />}
-            onClick={() => exportToExcel(filtered)}
-            className="border-slate-300 text-slate-600"
-          >
-            Xuất Excel
-          </Button>
-        </div>
+        <Button
+          size="middle"
+          icon={<Download size={14} />}
+          onClick={() => exportToExcel(filtered)}
+          className="ml-auto bg-[#2d5f1b] text-white hover:!bg-[#1e4012] hover:!text-white border-none flex items-center"
+        >
+          Xuất Excel
+        </Button>
       </div>
-
-      {/* New form inline */}
-      {!readOnly && showNewForm && (
-        <EquipmentRow
-          key="__new__"
-          eq={EMPTY_EQ()}
-          isNew
-          defaultOpen
-          onSave={(eq) => { onSave(eq); setShowNewForm(false) }}
-          onDelete={() => {}}
-        />
-      )}
 
       {/* Equipment list */}
       <div className="space-y-2">
@@ -187,24 +164,41 @@ export default function EquipmentListPage({ equipment, onSave, onDelete, user }:
           </div>
         )}
 
-        {paginated.map(eq => (
+        {/* 5. Đổi `filtered.map` thành `paginatedEquipment.map` */}
+        {paginatedEquipment.map(eq => (
           <EquipmentRow key={eq.id} eq={eq} onSave={onSave} onDelete={onDelete} readOnly={readOnly} />
         ))}
-      </div>
+        
+        {/* Accordion thêm mới */}
+        {!readOnly && (
+          <EquipmentRow key="__new__" eq={EMPTY_EQ()} isNew onSave={onSave} onDelete={() => {}} />
+        )}
 
-      {/* Pagination */}
-      {filtered.length > PAGE_SIZE && (
-        <div className="flex justify-center pt-2">
-          <Pagination
-            current={page}
-            pageSize={PAGE_SIZE}
-            total={filtered.length}
-            onChange={setPage}
-            showSizeChanger={false}
-            showTotal={(total, range) => `${range[0]}-${range[1]} / ${total} hồ sơ`}
-          />
-        </div>
-      )}
+        {/* 6. Thêm Component Phân trang của Ant Design */}
+        {filtered.length > 0 && (
+  <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 mt-2">
+    {/* Hiển thị thông số phụ bên trái (tùy chọn) */}
+    <div className="text-slate-500 text-sm">
+      Hiển thị {paginatedEquipment.length} / {filtered.length} thiết bị
+    </div>
+
+    <Pagination 
+      current={currentPage} 
+      total={filtered.length} 
+      pageSize={pageSize}
+      showSizeChanger
+      pageSizeOptions={['10', '20', '50', '100']}
+      // Thêm dòng này để hiển thị tổng quát
+      showTotal={(total) => `Tổng cộng ${total} mục`}
+      onChange={(page, size) => {
+        setCurrentPage(page);
+        setPageSize(size);
+      }}
+      size="small" // Giúp giao diện gọn hơn trên mobile
+    />
+  </div>
+)}
+      </div>
     </div>
   )
 }

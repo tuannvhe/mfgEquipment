@@ -29,27 +29,25 @@ const isDataURL = (v: any): v is string => typeof v === 'string' && v.startsWith
 function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
   const baseUrl = api.defaults.baseURL?.replace(/\/api\/?$/, '') || '';
   const formatUrl = (path: string) => {
-    if (!path) return path;
-    // Nếu đã là URL đầy đủ (Cloudinary, http, https, data:) thì giữ nguyên
-    if (path.startsWith('http') || path.startsWith('https') || path.startsWith('data:')) return path;
+    if (!path || path.startsWith('http') || path.startsWith('data:')) return path;
     // Đảm bảo không bị double slash
     const cleanPath = path.startsWith('/') ? path.slice(1) : path;
     return `${baseUrl}/${cleanPath}`;
   };
 
   const mapped: Equipment = {
-    id: String(data.id ?? ''),
+    id: String(data.Id ?? data.id ?? ''),
     appmodel: data.appliedModelName ?? data.appmodel ?? '',
     opcond: (data.operatingConditions ?? data.opcond ?? 'Good') as any,
     ctrlnum: data.controlNumber ?? data.ctrlnum ?? '',
-    eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? '',
+    eqtype: data.equipmentTitle ?? data.eqtype ?? 'Other',
     location: data.installationLocation ?? data.location ?? '',
     person: data.responsiblePerson ?? data.person ?? '',
     instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : data.instdate ?? '',
     value: data.equipmentPrice != null ? String(data.equipmentPrice) : data.value ?? '',
     mfgname: data.manufacturerName ?? data.mfgname ?? '',
-    eqtitle: data.equipmentTitle ?? data.eqtitle ?? '',
-    model: data.model ?? data.manufacturerModel ?? '',
+    eqtitle: data.manufacturerEquipmentTitle ?? data.eqtitle ?? '',
+    model: data.manufacturerModel ?? data.model ?? '',
     serial: data.serialNo ?? data.serial ?? '',
     power: data.power ?? data.power ?? '',
     mfgdate: data.dateOfManufacture ? data.dateOfManufacture.split('T')[0] : data.mfgdate ?? '',
@@ -58,51 +56,23 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
     makeraddr: data.manufacturerAddr ?? data.makeraddr ?? '',
     photo1: '',
     photo2: '',
-    // periodicInspections -> periodicItems, lọc bỏ row toàn null
-    periodicItems: (data.periodicInspections || data.periodicItems || [])
-      .filter((item: any) => item.inspectionInterval || item.periodicItems || item.dateOfInspection || item.inspectionDetails || item.interval || item.content)
-      .map((item: any) => ({
-        id: String(item.id || uid()),
-        interval: item.inspectionInterval || item.interval || '',
-        item: item.periodicItems || item.item || '',
-        inspdate: item.dateOfInspection ? item.dateOfInspection.split('T')[0] : (item.inspdate || ''),
-        content: item.inspectionDetails || item.content || '',
-      })),
-    // inspections: lấy date/detail từ periodicInspections, failure/replacement/inspector/remarks từ spareParts (cùng index)
-    inspections: (() => {
-      const periArr: any[] = data.periodicInspections || [];
-      const spareArr: any[] = data.spareParts || [];
-      const len = Math.max(periArr.length, spareArr.length);
-      const result: any[] = [];
-      for (let i = 0; i < len; i++) {
-        const p = periArr[i] || {};
-        const s = spareArr[i] || {};
-        const date = p.dateOfInspection ? p.dateOfInspection.split('T')[0] : '';
-        const detail = p.inspectionDetails || '';
-        const failure = s.failureHistory || '';
-        const replacement = s.replacementParts || '';
-        const inspector = s.inspector || '';
-        const remarks = s.remarks || '';
-        if (date || detail || failure || replacement || inspector || remarks) {
-          result.push({ id: String(p.id || s.id || uid()), date, detail, failure, replacement, inspector, remarks });
-        }
-      }
-      return result;
-    })(),
-    // spareParts: giữ row nếu có bất kỳ field nào có giá trị
-    spareParts: (data.spareParts || [])
-      .filter((item: any) => item.partName || item.partNumber || item.specification || item.quantity || item.failureHistory || item.replacementParts || item.inspector || item.remarks)
-      .map((item: any) => ({
-        id: String(item.id || uid()),
-        name: item.partName || item.name || '',
-        partnum: item.partNumber || item.partnum || '',
-        spec: item.specification || item.spec || '',
-        qty: String(item.quantity ?? item.qty ?? ''),
-        replacement: item.replacementParts || item.replacement || '',
-        failure: item.failureHistory || item.failure || '',
-        inspector: item.inspector || '',
-        remarks: item.remarks || '',
-      })),
+    periodicItems: data.periodicItems ?? data.PeriodicInspections ?? [],
+    inspections: (data.periodicInspections || data.inspections || []).map((item: any) => ({
+      id: String(item.id || uid()),
+      date: item.inspectionDate ? item.inspectionDate.split('T')[0] : (item.dateOfInspection ? item.dateOfInspection.split('T')[0] : (item.date || '')),
+      detail: item.description || item.periodicItems || item.detail || '',
+      failure: item.failureStatus || item.failure || '',
+      replacement: item.replacementPart || item.replacement || '',
+      inspector: item.inspectorName || item.inspector || '',
+      remarks: item.remarks || ''
+    })),
+    spareParts: (data.spareParts || []).map((item: any) => ({
+      id: String(item.id || uid()),
+      name: item.partName || item.name || '',
+      partnum: item.partNumber || item.partnum || '',
+      spec: item.specification || item.spec || '',
+      qty: item.quantity || item.qty || 0
+    })),
   };
 
  const serverMeta: any[] = [];
@@ -143,24 +113,24 @@ const toValidIntId = (id: any) => {
 function buildDetailFormData(eq: Equipment, id: string): FormData {
   const formData = new FormData();
   const vId = toValidIntId(id);
-  // EquipmentId chỉ cần cho update (vId > 0)
-  if (Number(vId) > 0) formData.append('EquipmentId', vId);
+  formData.append('Id', vId);
+  formData.append('EquipmentId', vId);
   formData.append('AppliedModelName', eq.appmodel || '');
   formData.append('OperatingConditions', eq.opcond || 'Good');
   formData.append('ControlNumber', eq.ctrlnum || '');
-  formData.append('EquipmentTitle', eq.eqtitle || '');
-  formData.append('EquipmentPrice', eq.value || '0');
+  formData.append('EquipmentTitle', eq.eqtype || '');
+  formData.append('EquipmentPrice', eq.value || '');
   formData.append('InstallationLocation', eq.location || '');
-  formData.append('DateOfInstallation', eq.instdate || '');
-  formData.append('ResponsiblePerson', eq.person || '');
+  if (eq.instdate) formData.append('DateOfInstallation', eq.instdate);
+  if (eq.person) formData.append('ResponsiblePerson', eq.person);
   formData.append('ManufacturerName', eq.mfgname || '');
-  formData.append('ManufacturerEquipmentTitle', eq.eqtype || '');
   formData.append('ManufacturerModel', eq.model || '');
   formData.append('SerialNo', eq.serial || '');
-  formData.append('DateOfManufacture', eq.mfgdate || '');
-  formData.append('Weight', eq.weight || '');
   formData.append('Power', eq.power || '');
+  if (eq.mfgdate) formData.append('DateOfManufacture', eq.mfgdate);
+  formData.append('Weight', eq.weight || '');
   formData.append('Size', eq.size || '');
+  formData.append('ManufacturerEquipmentTitle', eq.eqtitle || '');
 
 // --- LOGIC XỬ LÝ ẢNH (BẢN FIX TRIỆT ĐỂ) ---
 // KIỂM TRA QUAN TRỌNG: Log xem metadata có tồn tại không
@@ -196,28 +166,23 @@ const serverImages = (eq as any)._serverImages || [];
   processPhoto(eq.photo1, false); // Xử lý ảnh Trái (Type = false)
   processPhoto(eq.photo2, true);  // Xử lý ảnh Phải (Type = true)
 
-  // PeriodicInspections - indexed form fields (ASP.NET [FromForm] binding)
-  (eq.periodicItems || []).forEach((item, idx) => {
-    const iid = toValidIntId(item.id);
-    formData.append(`PeriodicInspections[${idx}][id]`, iid);
-    formData.append(`PeriodicInspections[${idx}][inspectionInterval]`, item.interval || '');
-    formData.append(`PeriodicInspections[${idx}][periodicItems]`, item.item || '');
-    if (item.inspdate) formData.append(`PeriodicInspections[${idx}][dateOfInspection]`, new Date(item.inspdate).toISOString());
-    formData.append(`PeriodicInspections[${idx}][inspectionDetails]`, item.content || '');
+  // Xử lý bảng con (giữ nguyên logic của bạn)
+  (eq.inspections || []).forEach((item, idx) => {
+    formData.append(`PeriodicInspections[${idx}].Id`, toValidIntId(item.id));
+    formData.append(`PeriodicInspections[${idx}].InspectionDate`, item.date || '');
+    formData.append(`PeriodicInspections[${idx}].Description`, item.detail || '');
+    formData.append(`PeriodicInspections[${idx}].FailureStatus`, item.failure || '');
+    formData.append(`PeriodicInspections[${idx}].ReplacementPart`, item.replacement || '');
+    formData.append(`PeriodicInspections[${idx}].InspectorName`, item.inspector || '');
+    formData.append(`PeriodicInspections[${idx}].Remarks`, item.remarks || '');
   });
 
-  // SpareParts - indexed form fields (ASP.NET [FromForm] binding)
   (eq.spareParts || []).forEach((item, idx) => {
-    const sid = toValidIntId(item.id);
-    formData.append(`SpareParts[${idx}][id]`, sid);
-    formData.append(`SpareParts[${idx}][partName]`, item.name || '');
-    formData.append(`SpareParts[${idx}][partNumber]`, item.partnum || '');
-    formData.append(`SpareParts[${idx}][specification]`, item.spec || '');
-    formData.append(`SpareParts[${idx}][quantity]`, String(Number(item.qty) || 0));
-    formData.append(`SpareParts[${idx}][replacementParts]`, item.replacement || '');
-    formData.append(`SpareParts[${idx}][failureHistory]`, item.failure || '');
-    formData.append(`SpareParts[${idx}][inspector]`, item.inspector || '');
-    formData.append(`SpareParts[${idx}][remarks]`, item.remarks || '');
+    formData.append(`SpareParts[${idx}].Id`, toValidIntId(item.id));
+    formData.append(`SpareParts[${idx}].PartName`, item.name || '');
+    formData.append(`SpareParts[${idx}].PartNumber`, item.partnum || '');
+    formData.append(`SpareParts[${idx}].Specification`, item.spec || '');
+    formData.append(`SpareParts[${idx}].Quantity`, String(item.qty || 0));
   });
 
   return formData;
@@ -243,13 +208,17 @@ export function useEquipmentStore() {
 
     const fetchEquipment = async () => {
       try {
-        const res = await api.get('/Equipment')
+        const timestamp = new Date().getTime();
+        const res = await api.get(`/Equipment?t=${timestamp}`); 
+        
         let list: any[] = []
         if (Array.isArray(res.data)) list = res.data
         else if (Array.isArray((res.data as any)?.data)) list = (res.data as any).data
         else if (Array.isArray((res.data as any)?.items)) list = (res.data as any).items
 
         const normalized = list.map(item => mapApiToEquipment(item))
+        
+        // Sửa lại logic ghi đè: Chỉ ghi đè nếu API thực sự trả về data
         if (normalized.length > 0) {
           setEquipment(normalized)
           localStorage.setItem('vt_equipment_v3', JSON.stringify(normalized))
@@ -285,67 +254,76 @@ export function useEquipmentStore() {
   }, [])
 
 const saveEquipment = useCallback(async (eq: Equipment) => {
-  try {
-    Swal.showLoading();
-    const isUpdate = Boolean(eq.id && !eq.id.includes('-'));
-    let response;
+    try {
+      Swal.showLoading();
+      
+      // FIX 1: Xác định isUpdate chặt chẽ hơn (bỏ qua id là '0', rỗng, hoặc có dấu '-')
+      const isUpdate = Boolean(eq.id && !String(eq.id).includes('-') && String(eq.id) !== '0');
+      let response;
 
-    // Phục hồi metadata
-    const originalRecord = equipment.find(e => String(e.id) === String(eq.id));
-    if (originalRecord && !(eq as any)._serverImages) {
-      (eq as any)._serverImages = (originalRecord as any)._serverImages;
-    }
+      // Phục hồi metadata cho ảnh
+      const originalRecord = equipment.find(e => String(e.id) === String(eq.id));
+      if (originalRecord && !(eq as any)._serverImages) {
+        (eq as any)._serverImages = (originalRecord as any)._serverImages;
+      }
 
-    if (isUpdate) {
-      const detailFormData = buildDetailFormData(eq, eq.id);
-      response = await api.put(`/Detail/update-full`, detailFormData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-    } else {
-      const createFormData = buildDetailFormData(eq, '0');
-      response = await api.post('/Equipment', createFormData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-    }
-
-    // --- PHẦN FIX: ĐẢM BẢO LOAD LẠI BẢNG ---
-    
-    // 1. Lấy dữ liệu thực tế từ Server trả về (Thường nằm trong response.data hoặc response.data.data)
-    const rawData = response.data?.data || response.data;
-    const updatedRecord = mapApiToEquipment(rawData);
-
-    // 2. Cập nhật State một cách tuyệt đối
-    setEquipment(prev => {
-      let next;
+      // Gọi API tương ứng
       if (isUpdate) {
-        // Thay thế bản ghi cũ dựa trên ID
-        next = prev.map(e => String(e.id) === String(updatedRecord.id) ? updatedRecord : e);
+        const detailFormData = buildDetailFormData(eq, eq.id);
+        response = await api.put(`/Detail/update-full`, detailFormData);
       } else {
-        // Thêm mới vào đầu danh sách (Spread giúp React nhận diện mảng mới hoàn toàn)
-        next = [updatedRecord, ...prev];
+        const createFormData = buildDetailFormData(eq, '0');
+        response = await api.post('/Equipment', createFormData);
       }
       
-      // 3. Đồng bộ bộ nhớ đệm
-      localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
-      return [...next]; // Spread một lần nữa để chắc chắn địa chỉ mảng thay đổi
-    });
+      // Kiểm tra dữ liệu trả về từ Server
+      const rawData = response.data?.data || response.data;
+      if (!rawData) throw new Error("Server không trả về dữ liệu sau khi lưu.");
 
-    Swal.fire({
-      icon: 'success',
-      title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
-      text: `Thiết bị ${updatedRecord.eqtitle} đã được cập nhật.`,
-      timer: 2000,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
-    });
+      // Chuẩn hóa dữ liệu thật từ Server
+      const updatedRecord = mapApiToEquipment(rawData);
+      if (isUpdate && (!updatedRecord.id || updatedRecord.id === '0' || updatedRecord.id === '')) {
+         updatedRecord.id = String(eq.id);
+      }
+      // --- FIX 2: CẬP NHẬT STATE THÔNG MINH (KHÔNG CẦN F5) ---
+      setEquipment(prev => {
+        const nextList = [...prev];
+        // Tìm xem bản ghi (với ID lúc đang thao tác) đã nằm sẵn trong danh sách chưa
+        const existingIndex = nextList.findIndex(item => String(item.id) === String(eq.id));
 
-    return updatedRecord;
+        if (existingIndex >= 0) {
+          // Nếu ĐÃ CÓ (Đang Edit hoặc đang Lưu một dòng tạm thời có ID chứa '-'):
+          // Ta GHI ĐÈ dòng cũ đó bằng dữ liệu chuẩn xịn (ID mới) từ Server
+          nextList[existingIndex] = updatedRecord;
+        } else {
+          // Nếu CHƯA CÓ (Thêm mới hoàn toàn từ một popup/form ngoài bảng):
+          // Thêm dữ liệu vào ĐẦU danh sách
+          nextList.unshift(updatedRecord);
+        }
+        
+        // Lưu ngay xuống LocalStorage
+        localStorage.setItem('vt_equipment_v3', JSON.stringify(nextList));
+        return nextList; 
+      });
 
-  } catch (error: any) {
-     // ... logic catch lỗi cũ của bạn giữ nguyên
-  }
-}, [equipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
+      Swal.fire({
+        icon: 'success',
+        title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
+        text: `Thiết bị ${updatedRecord.eqtitle} đã được lưu.`,
+        timer: 2500,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+
+      return updatedRecord;
+
+    } catch (error: any) {
+      console.error("Save error:", error);
+      Swal.fire('Lỗi!', error.response?.data?.message || 'Không thể lưu dữ liệu', 'error');
+      return null;
+    }
+  }, [equipment]);
 
   const deleteEquipment = useCallback(async (id: string) => {
   // Nếu là ID tạm (có dấu gạch ngang), chỉ cần xóa ở Local
@@ -384,7 +362,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
       Swal.fire({
         title: 'Đã xóa!',
         icon: 'success',
-        timer: 1500,
+        timer: 2500,
         showConfirmButton: false,
         toast: true,
         position: 'top-end'
