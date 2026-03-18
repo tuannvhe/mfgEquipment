@@ -36,7 +36,7 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
   };
 
   const mapped: Equipment = {
-    id: String(data.id ?? ''),
+    id: String(data.Id ?? data.id ?? ''),
     appmodel: data.appliedModelName ?? data.appmodel ?? '',
     opcond: (data.operatingConditions ?? data.opcond ?? 'Good') as any,
     ctrlnum: data.controlNumber ?? data.ctrlnum ?? '',
@@ -282,7 +282,9 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
 
       // Chuẩn hóa dữ liệu thật từ Server
       const updatedRecord = mapApiToEquipment(rawData);
-
+      if (isUpdate && (!updatedRecord.id || updatedRecord.id === '0' || updatedRecord.id === '')) {
+         updatedRecord.id = String(eq.id);
+      }
       // --- FIX 2: CẬP NHẬT STATE THÔNG MINH (KHÔNG CẦN F5) ---
       setEquipment(prev => {
         const nextList = [...prev];
