@@ -106,13 +106,15 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
   const rawList = data.images || data.equipmentImages || data.mainImages || [];
   const serverMeta: any[] = [];
 
-  if (Array.isArray(rawList)) {
+  if (Array.isArray(rawList) && rawList.length > 0) {
     rawList.forEach((img: any) => {
-      const isRight = img.imageType === true || img.type === true || img.imageType === 1;
+      // Backend của bạn có thể trả về 1 (int) hoặc true (bool) cho ảnh bên phải
+      const isRight = img.imageType === true || img.imageType === 1 || img.type === true;
+      
       serverMeta.push({ id: img.id, type: isRight });
 
-      // QUAN TRỌNG: Đọc relativePath từ Cloudinary nếu có
-      const path = img.relativePath || img.imagePath || img.path || img.url;
+      // Ưu tiên các trường path từ API
+      const path = img.imagePath || img.relativePath || img.path || img.url;
       const url = formatUrl(path);
 
       if (isRight) mapped.photo2 = url; 
@@ -313,7 +315,13 @@ const getDetail = useCallback(async (id: string) => {
 
 const saveEquipment = useCallback(async (eq: Equipment) => {
   try {
-    Swal.showLoading();
+    Swal.fire({
+      title: 'Đang xử lý...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
     const isUpdate = Boolean(eq.id && !eq.id.includes('-'));
     let response;
 
@@ -339,22 +347,19 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
     
     // 1. Lấy dữ liệu thực tế từ Server trả về (Thường nằm trong response.data hoặc response.data.data)
     const rawData = response.data?.data || response.data;
+    
+    // 2. Map lại data từ API thành đối tượng Equipment của React
+    // CHÚ Ý: Phải truyền rawData vào để mapApiToEquipment lấy URL ảnh mới từ Cloudinary/Server
     const updatedRecord = mapApiToEquipment(rawData);
 
-    // 2. Cập nhật State một cách tuyệt đối
     setEquipment(prev => {
-      let next;
-      if (isUpdate) {
-        // Thay thế bản ghi cũ dựa trên ID
-        next = prev.map(e => String(e.id) === String(updatedRecord.id) ? updatedRecord : e);
-      } else {
-        // Thêm mới vào đầu danh sách (Spread giúp React nhận diện mảng mới hoàn toàn)
-        next = [updatedRecord, ...prev];
-      }
+      const filtered = prev.filter(item => String(item.id) !== String(eq.id));
+      const next = isUpdate 
+        ? prev.map(e => String(e.id) === String(updatedRecord.id) ? updatedRecord : e)
+        : [updatedRecord, ...filtered];
       
-      // 3. Đồng bộ bộ nhớ đệm
       localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
-      return [...next]; // Spread một lần nữa để chắc chắn địa chỉ mảng thay đổi
+      return [...next];
     });
 
     Swal.fire({
@@ -367,10 +372,33 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
       position: 'top-end'
     });
 
-    return updatedRecord;
+    return { success: true, data: updatedRecord };
 
   } catch (error: any) {
-     // ... logic catch lỗi cũ của bạn giữ nguyên
+    console.error("Lỗi khi lưu thiết bị:", error);
+  
+  // 1. Phải đóng cái Swal "Đang xử lý..." đang hiện trên màn hình
+  Swal.close(); 
+
+  let errorContent = "";
+  if (error.response?.data?.errors) {
+    const messages = Object.values(error.response.data.errors).flat(); 
+    errorContent = `<ul style="text-align: left;">${messages.map(msg => `<li>${msg}</li>`).join('')}</ul>`;
+  } else {
+    errorContent = error.response?.data?.message || "Lỗi server.";
+  }
+
+  // 2. Hiện thông báo lỗi và đợi người dùng nhấn "Kiểm tra lại"
+  await Swal.fire({
+    icon: 'error',
+    title: 'Thông tin chưa hợp lệ',
+    html: errorContent, 
+    confirmButtonText: 'Kiểm tra lại',
+    confirmButtonColor: '#6975f8',
+  });
+
+  // 3. Trả về success: false để EquipmentListPage KHÔNG chạy lệnh setShowNewForm(false)
+  return { success: false };
   }
 }, [equipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
 

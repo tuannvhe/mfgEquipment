@@ -8,8 +8,8 @@ import EquipmentForm from './EquipmentForm'
 interface Props {
   eq: Equipment
   isNew?: boolean
-  onSave: (eq: Equipment) => void
-  onDelete: (id: string) => void
+ onSave: (data: Equipment) => Promise<{ success: boolean; data?: Equipment } | any>; 
+  onDelete: (id: string) => void;
   readOnly?: boolean
   defaultOpen?: boolean
 }
@@ -23,11 +23,24 @@ export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, read
     if (!isNew) setLocalForm({ ...eq })
   }, [eq, isNew])
 
-  const handleSave = (data: Equipment) => {
-    onSave(data)
-    if (isNew) setOpen(false)
-  }
+  const handleSave = async (data: Equipment) => {
+  // 1. Đợi kết quả trả về từ hàm onSave (hàm này chính là hàm ở bước 1 truyền vào)
+  const result = await onSave(data);
 
+  // 2. Log ra để kiểm tra nếu cần: console.log("Save result in Row:", result);
+
+  if (result && result.success === true) {
+    // CHỈ KHI THÀNH CÔNG: Đóng form mở rộng
+    setOpen(false); 
+    if (result.data) {
+      setLocalForm(result.data);
+    }
+  } else {
+    // KHI LỖI: Tuyệt đối không gọi setOpen(false)
+    // Thông báo lỗi đã được Store hiển thị qua Swal rồi.
+    console.warn("Lưu thất bại, giữ nguyên form.");
+  }
+};
   const handleDelete = (id: string) => {
     onDelete(id)
     setOpen(false)

@@ -81,14 +81,6 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     api.get(`/Detail/${initialData.id}`)
       .then(res => {
         const data = res.data
-        // Build _serverImages metadata from response
-        const rawList = data.images || data.mainImages || data.equipmentImages || []
-        const serverImages = Array.isArray(rawList)
-          ? rawList.map((img: any) => ({
-              id: img.id,
-              type: img.imageType === true || img.type === true || img.imageType === 1,
-            }))
-          : []
         setForm(prev => ({
           ...prev,
           appmodel: data.appliedModelName ?? data.appmodel ?? prev.appmodel,
@@ -100,78 +92,18 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
           instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : prev.instdate,
           person: data.responsiblePerson ?? data.person ?? prev.person,
           mfgname: data.manufacturerName ?? data.mfgname ?? prev.mfgname,
-          model: data.model ?? data.manufacturerModel ?? prev.model,
+          model: data.manufacturerModel ?? data.model ?? prev.model,
           serial: data.serialNo ?? data.serial ?? prev.serial,
           power: data.power ?? prev.power,
           mfgdate: data.dateOfManufacture ? data.dateOfManufacture.split('T')[0] : prev.mfgdate,
           weight: data.weight ?? prev.weight,
           size: data.size ?? prev.size,
           eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? prev.eqtype,
-          _serverImages: serverImages.length > 0 ? serverImages : (prev as any)._serverImages,
-          photo1: (() => {
-            const imgs = data.images || data.mainImages || [];
-            const left = imgs.find((i: any) => i.imageType === false || i.type === false || i.imageType === 0);
-            return left?.imagePath || left?.path || left?.url || prev.photo1;
-          })(),
-          photo2: (() => {
-            const imgs = data.images || data.mainImages || [];
-            const right = imgs.find((i: any) => i.imageType === true || i.type === true || i.imageType === 1);
-            return right?.imagePath || right?.path || right?.url || prev.photo2;
-          })(),
-          periodicItems: (data.periodicInspections || data.periodicItems || [])
-            .filter((item: any) => item.inspectionInterval || item.periodicItems || item.dateOfInspection || item.inspectionDetails)
-            .map((item: any) => ({
-              id: String(item.id || `p_${Date.now()}`),
-              interval: item.inspectionInterval || item.interval || '',
-              item: item.periodicItems || item.item || '',
-              inspdate: item.dateOfInspection ? item.dateOfInspection.split('T')[0] : (item.inspdate || ''),
-              content: item.inspectionDetails || item.content || '',
-            })),
-          inspections: (() => {
-            if (Array.isArray(data.inspections) && data.inspections.length > 0) {
-              return data.inspections.map((item: any) => ({
-                id: String(item.id || `i_${Date.now()}`),
-                date: item.inspectionDate ? item.inspectionDate.split('T')[0] : (item.date || ''),
-                detail: item.description || item.inspectionDetails || item.detail || '',
-                failure: item.failureStatus || item.failureHistory || item.failure || '',
-                replacement: item.replacementPart || item.replacementParts || item.replacement || '',
-                inspector: item.inspectorName || item.inspector || '',
-                remarks: item.remarks || '',
-              }));
-            }
-            // Fallback: ghép từ periodicInspections + spareParts (backend gộp chung)
-            const periArr: any[] = data.periodicInspections || [];
-            const spareArr: any[] = data.spareParts || [];
-            const len = Math.max(periArr.length, spareArr.length);
-            const result: any[] = [];
-            for (let i = 0; i < len; i++) {
-              const p = periArr[i] || {};
-              const s = spareArr[i] || {};
-              const date = p.dateOfInspection ? p.dateOfInspection.split('T')[0] : '';
-              const detail = p.inspectionDetails || '';
-              const failure = s.failureHistory || '';
-              const replacement = s.replacementParts || '';
-              const inspector = s.inspector || '';
-              const remarks = s.remarks || '';
-              if (date || detail || failure || replacement || inspector || remarks) {
-                result.push({ id: String(p.id || s.id || `i_${Date.now()}_${i}`), date, detail, failure, replacement, inspector, remarks });
-              }
-            }
-            return result;
-          })(),
-          spareParts: (data.spareParts || [])
-            .filter((item: any) => item.partName || item.partNumber || item.specification || item.quantity || item.failureHistory || item.replacementParts || item.inspector || item.remarks)
-            .map((item: any) => ({
-              id: String(item.id || `s_${Date.now()}`),
-              name: item.partName || item.name || '',
-              partnum: item.partNumber || item.partnum || '',
-              spec: item.specification || item.spec || '',
-              qty: String(item.quantity ?? item.qty ?? ''),
-              replacement: item.replacementParts || item.replacement || '',
-              failure: item.failureHistory || item.failure || '',
-              inspector: item.inspector || '',
-              remarks: item.remarks || '',
-            })),
+          photo1: data.mainImagePath?.[0] || (data.mainImages?.find((i:any)=>i.type===false)?.path) || prev.photo1,
+          photo2: data.mainImagePath?.[1] || (data.mainImages?.find((i:any)=>i.type===true)?.path) || prev.photo2,
+          periodicItems: data.periodicItems ?? data.periodicInspections ?? prev.periodicItems,
+          inspections: data.inspections ?? prev.inspections,
+          spareParts: data.spareParts ?? prev.spareParts,
         }))
       })
       .catch(err => {
@@ -192,11 +124,8 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   const set = <K extends keyof Equipment>(key: K, val: Equipment[K]) =>
     setForm(f => ({ ...f, [key]: val }))
 
-  const handleSave = () => {
-    if (!form.eqtitle && !form.model && !form.appmodel) {
-      alert('Vui lòng điền ít nhất Tên thiết bị hoặc Model!')
-      return
-    }
+  const handleSave = async () => {
+    
     
     // Clean empty arrays - giữ row nếu có bất kỳ field nào có giá trị
     const cleanForm = { ...form };
@@ -208,8 +137,8 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     );
     cleanForm.inspections = [];
     
-    onSave(cleanForm)
-    if (isNew) setForm({ ...initialData })
+    await onSave(cleanForm)
+    //if (isNew) setForm({ ...initialData })
   }
 
   // Periodic Item Helpers
@@ -260,9 +189,9 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   // Row Management Helpers
   const commonExtra = Math.max(extraP, extraS)
   const commonLength = Math.max(form.periodicItems?.length || 0, form.spareParts?.length || 0)
-  const pRowCount = Math.max(1 + commonExtra, commonLength)
-  const sRowCount = Math.max(1 + commonExtra, commonLength)
-  const botRowCount = Math.max(1 + extraBot, commonLength)
+  const pRowCount = Math.max(4 + commonExtra, commonLength)
+  const sRowCount = Math.max(4 + commonExtra, commonLength)
+  const botRowCount = Math.max(4 + extraBot, form.inspections?.length || 0)
 
   const clearPRow = (i: number) => {
     const newP = [...(form.periodicItems || [])]
@@ -313,13 +242,10 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   }
 
   const deleteBotLRow = (i: number) => {
-    if (botRowCount <= 1) return
-    const newP = [...(form.periodicItems || [])]
-    if (newP.length > i) newP.splice(i, 1)
-    set('periodicItems', newP)
-    const newS = [...(form.spareParts || [])]
-    if (newS.length > i) newS.splice(i, 1)
-    set('spareParts', newS)
+    if (botRowCount <= 4) return
+    const newI = [...(form.inspections || [])]
+    if (newI.length > i) newI.splice(i, 1)
+    set('inspections', newI)
     if (extraBot > 0) setExtraBot(b => b - 1)
   }
 

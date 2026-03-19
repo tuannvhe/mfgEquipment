@@ -4,7 +4,7 @@ import { Search, X, Settings2, CheckCircle2, AlertCircle, XCircle, Download, Plu
 import type { Equipment, User } from '../types'
 import { exportToExcel } from '../utils/excelExport'
 import EquipmentRow from '../components/EquipmentRow'
-import { PAGE_SIZE } from '../store/useStore'
+//import { PAGE_SIZE } from '../store/useStore'
 const EQ_TYPES = ['Winding', 'Riveting Assembly', 'Capacitor Assembly', 'Other']
 const LOCATIONS = ['Bắc Giang #1', 'Bắc Giang #2', 'Bắc Ninh', 'Hà Nam', 'Hưng Yên']
 
@@ -23,9 +23,10 @@ interface Props {
   currentPage: number
   pageSize: number // <--- Nhận thêm pageSize từ Props
   fetchEquipment: (page: number, q?: string, loc?: string, type?: string, status?: string, size?: number) => void
-  onSave: (eq: Equipment) => void
-  onDelete: (id: string) => void
+  onSave: (eq: Equipment) => Promise<{ success: boolean; data?: Equipment } | any>;
+  onDelete: (id: string) => void;
   user: User
+
 }
 
 export default function EquipmentListPage({ 
@@ -173,18 +174,29 @@ const handlePageChange = (page: number, size: number) => {
       </div>
 
 {/* KHỐI HIỂN THỊ FORM THÊM MỚI */}
-      {!readOnly && showNewForm && (
-        <div className="mb-4">
-          <EquipmentRow
-            key="__new__"
-            eq={EMPTY_EQ()}
-            isNew
-            defaultOpen
-            onSave={(eq) => { onSave(eq); setShowNewForm(false) }}
-            onDelete={() => {}}
-          />
-        </div>
-      )}
+{!readOnly && showNewForm && (
+  <div className="mb-4">
+    <EquipmentRow
+      key="__new__"
+      eq={EMPTY_EQ()}
+      isNew
+      defaultOpen
+      onSave={async (eq) => {
+        // Gọi hàm save từ Store
+        const result = await onSave(eq); 
+
+        // CHỈ đóng form danh sách khi thực sự thành công
+        if (result && result.success === true) {
+          setShowNewForm(false);
+        }
+        
+        // CỰC KỲ QUAN TRỌNG: Phải return result để EquipmentRow nhận được success: false
+        return result; 
+      }}
+      onDelete={() => setShowNewForm(false)}
+    />
+  </div>
+)}
 
       {/* KHỐI DANH SÁCH CHÍNH */}
       <div className="min-h-[400px]"> 
