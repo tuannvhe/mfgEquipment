@@ -118,8 +118,8 @@
       const path = img.imagePath || img.relativePath || img.path || img.url;
       const url = formatUrl(path);
 
-      if (isRight) mapped.photo2 = finalUrl;
-      else mapped.photo1 = finalUrl;
+      if (isRight) mapped.photo2 = url;
+      else mapped.photo1 = url;
     });
   }
     // Cực kỳ quan trọng: Gán lại meta
