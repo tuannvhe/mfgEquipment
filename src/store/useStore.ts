@@ -3,7 +3,6 @@ import type { Equipment } from '../types'
 import { exportToExcel } from '../utils/excelExport'
 import api from '../utils/api'
 import Swal from 'sweetalert2' // 1. Import SweetAlert2
-
 // 1. Export uid ngay tại đây để các file khác có thể import { uid }
 export const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
@@ -28,17 +27,15 @@ const isDataURL = (v: any): v is string => typeof v === 'string' && v.startsWith
 
 function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
   const baseUrl = api.defaults.baseURL?.replace(/\/api\/?$/, '') || '';
+  
   const formatUrl = (path: string) => {
-    if (!path) return path;
-    // Nếu đã là URL đầy đủ (Cloudinary, http, https, data:) thì giữ nguyên
-    if (path.startsWith('http') || path.startsWith('https') || path.startsWith('data:')) return path;
-    // Đảm bảo không bị double slash
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
     const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-    return `${baseUrl}/${cleanPath}`;
+    return `${baseUrl}/${cleanPath}?v=${Date.now()}`; // Thêm version để tránh cache
   };
-
   const mapped: Equipment = {
-    id: String(data.id ?? ''),
+    id: String(data.id && data.id !== 0 ? data.id : (data.equipmentId || '')),
     appmodel: data.appliedModelName ?? data.appmodel ?? '',
     opcond: (data.operatingConditions ?? data.opcond ?? 'Good') as any,
     ctrlnum: data.controlNumber ?? data.ctrlnum ?? '',
@@ -105,21 +102,23 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
       })),
   };
 
- const serverMeta: any[] = [];
   // Kiểm tra tất cả các trường có thể chứa ảnh
-  const rawList = data.images || data.mainImages || data.equipmentImages || [];
+  const rawList = data.images || data.equipmentImages || data.mainImages || [];
+  const serverMeta: any[] = [];
 
-  if (Array.isArray(rawList) && rawList.length > 0) {
+  if (Array.isArray(rawList)) {
     rawList.forEach((img: any) => {
       const isRight = img.imageType === true || img.type === true || img.imageType === 1;
-      
       serverMeta.push({ id: img.id, type: isRight });
 
-      const url = formatUrl(img.imagePath || img.path || img.url);
+      // QUAN TRỌNG: Đọc relativePath từ Cloudinary nếu có
+      const path = img.relativePath || img.imagePath || img.path || img.url;
+      const url = formatUrl(path);
+
       if (isRight) mapped.photo2 = url; 
       else mapped.photo1 = url;
     });
-  } 
+  }
   // Trường hợp Fallback: Nếu BE trả về mảng string đơn thuần (mainImagePath)
   else if (Array.isArray(data.mainImagePath)) {
      data.mainImagePath.forEach((path: string, i: number) => {
@@ -167,31 +166,32 @@ function buildDetailFormData(eq: Equipment, id: string): FormData {
 const serverImages = (eq as any)._serverImages || [];
 
   const processPhoto = (photo: string | null | undefined, isRight: boolean) => {
-    // Tìm ảnh gốc từ server dựa trên vị trí (Trái/Phải)
-    const original = serverImages.find((img: any) => img.type === isRight);
-    
-    const isNewUpload = isDataURL(photo); // Ảnh mới (base64)
-    const isRemoving = !photo || photo.trim() === ""; // Người dùng xóa ảnh
+  // 1. Tìm TẤT CẢ ảnh cũ ở vị trí này (phòng trường hợp DB đang bị trùng sẵn)
+  const originalsAtPosition = serverImages.filter((img: any) => 
+    (img.imageType === isRight || img.type === isRight)
+  );
+  
+  const isNewUpload = isDataURL(photo); 
+  const isRemoving = !photo || photo.trim() === "";
 
-    // TH 1: NẾU CÓ THAY ĐỔI (Upload mới hoặc Xóa hẳn) -> Gửi lệnh xóa ảnh cũ
-    if (original && (isNewUpload || isRemoving)) {
-      // Quan trọng: Gửi key đơn giản 'DeletedImageIds', ASP.NET sẽ tự gom vào List<int>
-      formData.append('DeletedImageIds', String(original.id));
-      
-    }
+  // TH 1: NẾU CÓ THAY ĐỔI (Upload mới hoặc Xóa hẳn)
+  if (isNewUpload || isRemoving) {
+    // Gửi lệnh xóa TẤT CẢ các ID cũ tại vị trí này để dọn dẹp sạch sẽ
+    originalsAtPosition.forEach((oldImg: any) => {
+      formData.append('DeletedImageIds', String(oldImg.id));
+    });
+  }
 
-    // TH 2: UPLOAD ẢNH MỚI
-    if (isNewUpload) {
-      const file = dataURLtoFile(photo as string, `upload_${isRight ? 'Right' : 'Left'}.png`);
-      formData.append('files', file); // Tên phải khớp chính xác với List<IFormFile> ở Backend
-      formData.append('ImageTypes', isRight ? 'true' : 'false'); 
-      
-    }
-
-    // TH 3: GIỮ NGUYÊN ẢNH CŨ
-    // Nếu không có isNewUpload và photo vẫn tồn tại, KHÔNG append gì cả. 
-    // Backend sẽ tự hiểu là giữ nguyên các bản ghi không nằm trong DeletedImageIds.
-  };
+  // TH 2: UPLOAD ẢNH MỚI
+  if (isNewUpload) {
+    const file = dataURLtoFile(photo as string, `upload_${isRight ? 'Right' : 'Left'}.png`);
+    formData.append('files', file); 
+    formData.append('ImageTypes', String(isRight)); // Gửi 'true' hoặc 'false' dưới dạng string
+  }
+  
+  // TH 3: Nếu là ảnh cũ (không phải dataURL) và không xóa, 
+  // thì KHÔNG append DeletedImageIds, Backend sẽ giữ nguyên ID đó.
+};
 
   processPhoto(eq.photo1, false); // Xử lý ảnh Trái (Type = false)
   processPhoto(eq.photo2, true);  // Xử lý ảnh Phải (Type = true)
@@ -236,48 +236,75 @@ export function useEquipmentStore() {
   const [loading, setLoading] = useState(true)
   const loadedOnce = useRef(false)
   const fetchingId = useRef<string | null>(null);
-const [totalItems, setTotalItems] = useState(0);
-  useEffect(() => {
-    if (loadedOnce.current) return
-    loadedOnce.current = true
-
-    const fetchEquipment = async () => {
-      try {
-        const res = await api.get('/Equipment')
-        let list: any[] = []
-        if (Array.isArray(res.data)) list = res.data
-        else if (Array.isArray((res.data as any)?.data)) list = (res.data as any).data
-        else if (Array.isArray((res.data as any)?.items)) list = (res.data as any).items
-
-        const normalized = list.map(item => mapApiToEquipment(item))
-        if (normalized.length > 0) {
-          setEquipment(normalized)
-          localStorage.setItem('vt_equipment_v3', JSON.stringify(normalized))
-        }
-      } catch (err) { console.warn('Load API fail:', err) }
-      finally { setLoading(false) }
-    }
-    fetchEquipment()
-  }, [])
-
-  // --- PHẦN SỬA 2: THÊM HÀM GET DETAIL ĐỂ LOAD DỮ LIỆU KHI BẤM VÀO ITEM ---
-  const getDetail = useCallback(async (id: string) => {
-    if (!id || id.includes('-') || fetchingId.current === id) return null;
-    fetchingId.current = id;
-    setLoading(true);
+  const [totalItems, setTotalItems] = useState(0); // Quan trọng: Lưu tổng số từ server
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10); // Thêm state pageSize
+  
+const fetchEquipment = useCallback(async (
+  page: number, 
+  searchTerm: string = '', 
+  location?: string, 
+  type?: string, 
+  status?: string,
+  size?: number // Nhận thêm tham số size
+) => {
     try {
-      const res = await api.get(`/Detail/${id}`);
-      const fullData = mapApiToEquipment(res.data);
-      setEquipment(prev => prev.map(e => e.id === id ? fullData : e));
-      return fullData;
+      const currentSize = size || pageSize; // Ưu tiên size mới truyền vào, không thì dùng state
+      const res = await api.get('/Equipment', {
+        params: { 
+          page, 
+          pageSize: currentSize, // Gửi size lên Server
+          searchTerm, 
+          location, 
+          type, 
+          status 
+        }
+      });
+
+      const items = res.data?.items || [];
+      const total = res.data?.totalCount || 0;
+      const normalized = items.map((item: any) => mapApiToEquipment(item));
+      
+      setEquipment(normalized);
+      setTotalItems(total);
+      setCurrentPage(page);
+      if (size) setPageSize(size); // Cập nhật state nếu có sự thay đổi size
     } catch (err) {
-      console.error("Load detail fail:", err);
-      return null;
+      console.warn('Load API fail:', err);
     } finally {
       setLoading(false);
-      fetchingId.current = null;
     }
-  }, []);
+}, [pageSize]);
+  // Gọi lần đầu khi mount
+ useEffect(() => {
+    fetchEquipment(1).then(() => setLoading(false));
+}, [fetchEquipment]);
+
+  // --- PHẦN SỬA 2: THÊM HÀM GET DETAIL ĐỂ LOAD DỮ LIỆU KHI BẤM VÀO ITEM ---
+const getDetail = useCallback(async (id: string) => {
+  if (!id || id.includes('-') || fetchingId.current === id) return null;
+  fetchingId.current = id;
+  setLoading(true);
+  try {
+    const res = await api.get(`/Detail/${id}`);
+    const fullData = mapApiToEquipment(res.data);
+    
+    setEquipment(prev => {
+      const next = prev.map(e => String(e.id) === String(id) ? fullData : e);
+      // Cập nhật lại cache để lần sau mở ra có ảnh ngay
+      localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
+      return [...next];
+    });
+    
+    return fullData;
+  } catch (err) {
+    console.error("Load detail fail:", err);
+    return null;
+  } finally {
+    setLoading(false);
+    fetchingId.current = null;
+  }
+}, []);
 
   const persist = useCallback((next: Equipment[]) => {
     localStorage.setItem('vt_equipment_v3', JSON.stringify(next))
@@ -334,7 +361,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
       icon: 'success',
       title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
       text: `Thiết bị ${updatedRecord.eqtitle} đã được cập nhật.`,
-      timer: 2000,
+      timer: 2500,
       showConfirmButton: false,
       toast: true,
       position: 'top-end'
@@ -384,7 +411,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
       Swal.fire({
         title: 'Đã xóa!',
         icon: 'success',
-        timer: 1500,
+        timer: 2500,
         showConfirmButton: false,
         toast: true,
         position: 'top-end'
@@ -399,5 +426,15 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
     exportToExcel(data, `VINATech_Equipment_${new Date().toISOString().slice(0, 10)}.xlsx`)
   }, [])
 
-  return { equipment, loading, getDetail, saveEquipment, deleteEquipment, exportExcel, persist }
+  return { 
+    equipment, 
+    loading, 
+    totalItems, 
+    currentPage, 
+    fetchEquipment, // Export hàm này ra ngoài
+    getDetail, 
+    pageSize,
+    saveEquipment, 
+    deleteEquipment 
+  };
 }

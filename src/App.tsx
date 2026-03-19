@@ -43,7 +43,17 @@ function AppInner() {
   const [view, setView] = useState<ViewKey>('list')
   const [collapsed, setCollapsed] = useState(false)
 
-  const { equipment, loading, saveEquipment, deleteEquipment, exportExcel } = useEquipmentStore()
+  // Tìm dòng 46 và sửa lại như sau:
+const { 
+  equipment, 
+  loading, 
+  totalItems, 
+  currentPage: activePage, // Đổi tên ở đây để tránh trùng lặp
+  fetchEquipment,
+  saveEquipment, 
+  pageSize,
+  deleteEquipment 
+} = useEquipmentStore();
   const { message } = AntApp.useApp()
   
   // Update view if user role doesn't allow current view
@@ -59,7 +69,13 @@ function AppInner() {
   if (!user) {
     return <LoginPage onLogin={(loggedUser) => setUser(loggedUser)} />
   }
-
+  if (loading && equipment.length === 0) {
+  return (
+    <div className="min-h-screen flex items-center justify-center text-slate-500 font-semibold">
+      Đang tải hệ thống...
+    </div>
+  )
+}
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-slate-500 font-semibold">
@@ -261,7 +277,18 @@ function AppInner() {
         {/* ── Content Area ── */}
         <Content style={{ padding: '15px 20px', overflowY: 'auto' }}>
           <div className="fade-in">
-            {view === 'list'  && <EquipmentListPage equipment={equipment} onSave={handleSave} onDelete={handleDelete} user={user} />}
+            {view === 'list' && (
+              <EquipmentListPage 
+                equipment={equipment} 
+                totalItems={totalItems} 
+                currentPage={activePage}
+                pageSize={pageSize} // <--- Truyền vào đây
+                fetchEquipment={fetchEquipment}
+                onSave={handleSave} 
+                onDelete={handleDelete} 
+                user={user} 
+              />
+            )}
             {view === 'fail'  && <FailurePage        equipment={equipment} user={user} />}
           </div>
         </Content>

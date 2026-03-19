@@ -480,7 +480,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                 <TdLabel>Size<br/>Kích thước</TdLabel>
                 <TdValue><ExcelInput value={form.size} onChange={(v: string) => set('size', v)} className={`font-mono ${inputClass}`} /></TdValue>
               </tr>
-
+            
               {/* === ROW 7 === */}
               <tr>
                 <TdValue colSpan={4} className="bg-[#f0f4eb] p-0 relative group/photo hover:bg-[#e6ebdf] transition-colors cursor-pointer border-black">
