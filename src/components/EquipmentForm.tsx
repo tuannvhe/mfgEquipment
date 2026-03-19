@@ -193,10 +193,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     setForm(f => ({ ...f, [key]: val }))
 
   const handleSave = () => {
-    if (!form.eqtitle && !form.model && !form.appmodel) {
-      alert('Vui lòng điền ít nhất Tên thiết bị hoặc Model!')
-      return
-    }
+    
     
     // Clean empty arrays - giữ row nếu có bất kỳ field nào có giá trị
     const cleanForm = { ...form };
