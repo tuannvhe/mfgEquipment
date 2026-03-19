@@ -107,14 +107,16 @@
     const rawList = data.images || data.equipmentImages || data.mainImages || [];
   const serverMeta: any[] = [];
 
-  if (Array.isArray(rawList)) {
+  if (Array.isArray(rawList) && rawList.length > 0) {
     rawList.forEach((img: any) => {
-      // Backend: true/1 là ảnh Phải (photo2), false/0 là ảnh Trái (photo1)
-      const isRight = img.imageType === true || img.imageType === 1;
+      // Backend của bạn có thể trả về 1 (int) hoặc true (bool) cho ảnh bên phải
+      const isRight = img.imageType === true || img.imageType === 1 || img.type === true;
+      
       serverMeta.push({ id: img.id, type: isRight });
 
-      const path = img.imagePath || img.relativePath || img.url || img.path;
-      const finalUrl = formatUrl(path);
+      // Ưu tiên các trường path từ API
+      const path = img.imagePath || img.relativePath || img.path || img.url;
+      const url = formatUrl(path);
 
       if (isRight) mapped.photo2 = finalUrl;
       else mapped.photo1 = finalUrl;
@@ -303,15 +305,17 @@
       setEquipment(next)
     }, [])
 
-  const saveEquipment = useCallback(async (eq: Equipment) => {
-    try {
-      Swal.fire({
+const saveEquipment = useCallback(async (eq: Equipment) => {
+  try {
+    Swal.fire({
       title: 'Đang xử lý...',
-      didOpen: () => Swal.showLoading(),
-      allowOutsideClick: false
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
     });
-      const isUpdate = Boolean(eq.id && !eq.id.includes('-'));
-      let response;
+    const isUpdate = Boolean(eq.id && !eq.id.includes('-'));
+    let response;
 
       // Phục hồi metadata
       const originalRecord = equipment.find(e => String(e.id) === String(eq.id));
@@ -331,27 +335,24 @@
         });
       }
 
-      // --- PHẦN FIX: ĐẢM BẢO LOAD LẠI BẢNG ---
-      
-      // 1. Lấy dữ liệu thực tế từ Server trả về (Thường nằm trong response.data hoặc response.data.data)
-      const rawData = response.data?.data || response.data;
-      const updatedRecord = mapApiToEquipment(rawData);
+    // --- PHẦN FIX: ĐẢM BẢO LOAD LẠI BẢNG ---
+    
+    // 1. Lấy dữ liệu thực tế từ Server trả về (Thường nằm trong response.data hoặc response.data.data)
+    const rawData = response.data?.data || response.data;
+    
+    // 2. Map lại data từ API thành đối tượng Equipment của React
+    // CHÚ Ý: Phải truyền rawData vào để mapApiToEquipment lấy URL ảnh mới từ Cloudinary/Server
+    const updatedRecord = mapApiToEquipment(rawData);
 
-      // 2. Cập nhật State một cách tuyệt đối
-      setEquipment(prev => {
-        let next;
-        if (isUpdate) {
-          // Thay thế bản ghi cũ dựa trên ID
-          next = prev.map(e => String(e.id) === String(updatedRecord.id) ? updatedRecord : e);
-        } else {
-          // Thêm mới vào đầu danh sách (Spread giúp React nhận diện mảng mới hoàn toàn)
-          next = [updatedRecord, ...prev];
-        }
-        
-        // 3. Đồng bộ bộ nhớ đệm
-        localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
-        return [...next]; // Spread một lần nữa để chắc chắn địa chỉ mảng thay đổi
-      });
+    setEquipment(prev => {
+      const filtered = prev.filter(item => String(item.id) !== String(eq.id));
+      const next = isUpdate 
+        ? prev.map(e => String(e.id) === String(updatedRecord.id) ? updatedRecord : e)
+        : [updatedRecord, ...filtered];
+      
+      localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
+      return [...next];
+    });
 
       Swal.fire({
         icon: 'success',
@@ -363,40 +364,35 @@
         position: 'top-end'
       });
 
-      return updatedRecord;
+    return { success: true, data: updatedRecord };
 
-    } catch (error: any) {
-      console.error("Save error:", error);
-    
-    // --- BƯỚC 2: XỬ LÝ LỖI TỪ SERVER (BACKEND VALIDATION) ---
-    let errorMessage = "Đã có lỗi xảy ra khi lưu dữ liệu.";
-    
-    if (error.response) {
-      // Server trả về lỗi (400, 401, 500...)
-      const serverData = error.response.data;
-      
-      // Nếu Backend trả về danh sách lỗi (thường là ASP.NET Validation)
-      if (serverData.errors) {
-        errorMessage = Object.values(serverData.errors).flat().join('<br/>');
-      } else {
-        errorMessage = serverData.message || serverData || errorMessage;
-      }
-    } else if (error.request) {
-      // Không kết nối được tới Server
-      errorMessage = "Không thể kết nối tới máy chủ. Vui lòng kiểm tra mạng.";
-    }
+  } catch (error: any) {
+    console.error("Lỗi khi lưu thiết bị:", error);
+  
+  // 1. Phải đóng cái Swal "Đang xử lý..." đang hiện trên màn hình
+  Swal.close(); 
 
-    Swal.fire({
-      icon: 'error',
-      title: 'Lỗi hệ thống',
-      html: errorMessage,
-      confirmButtonText: 'Xem xét lại',
-      confirmButtonColor: '#3085d6'
-    });
-    
-    return null;
-    }
-  }, [equipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
+  let errorContent = "";
+  if (error.response?.data?.errors) {
+    const messages = Object.values(error.response.data.errors).flat(); 
+    errorContent = `<ul style="text-align: left;">${messages.map(msg => `<li>${msg}</li>`).join('')}</ul>`;
+  } else {
+    errorContent = error.response?.data?.message || "Lỗi server.";
+  }
+
+  // 2. Hiện thông báo lỗi và đợi người dùng nhấn "Kiểm tra lại"
+  await Swal.fire({
+    icon: 'error',
+    title: 'Thông tin chưa hợp lệ',
+    html: errorContent, 
+    confirmButtonText: 'Kiểm tra lại',
+    confirmButtonColor: '#6975f8',
+  });
+
+  // 3. Trả về success: false để EquipmentListPage KHÔNG chạy lệnh setShowNewForm(false)
+  return { success: false };
+  }
+}, [equipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
 
     const deleteEquipment = useCallback(async (id: string) => {
     // Nếu là ID tạm (có dấu gạch ngang), chỉ cần xóa ở Local
