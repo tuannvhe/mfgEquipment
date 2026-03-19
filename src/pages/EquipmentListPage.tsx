@@ -4,7 +4,7 @@ import { Search, X, Settings2, CheckCircle2, AlertCircle, XCircle, Download, Plu
 import type { Equipment, User } from '../types'
 import { exportToExcel } from '../utils/excelExport'
 import EquipmentRow from '../components/EquipmentRow'
-import { PAGE_SIZE } from '../store/useStore'
+
 const EQ_TYPES = ['Winding', 'Riveting Assembly', 'Capacitor Assembly', 'Other']
 const LOCATIONS = ['Bắc Giang #1', 'Bắc Giang #2', 'Bắc Ninh', 'Hà Nam', 'Hưng Yên']
 
