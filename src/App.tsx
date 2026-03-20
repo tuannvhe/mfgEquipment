@@ -47,11 +47,11 @@ function AppInner() {
 const { 
   equipment, 
   loading, 
-  totalItems, 
-  currentPage: activePage, // Đổi tên ở đây để tránh trùng lặp
-  fetchEquipment,
+ // totalItems, 
+  //currentPage: activePage, // Đổi tên ở đây để tránh trùng lặp
+  //fetchEquipment,
   saveEquipment, 
-  pageSize,
+  //pageSize,
   deleteEquipment 
 } = useEquipmentStore();
   const { message } = AntApp.useApp()
@@ -280,10 +280,10 @@ const {
             {view === 'list' && (
               <EquipmentListPage 
                 equipment={equipment} 
-                totalItems={totalItems} 
-                currentPage={activePage}
-                pageSize={pageSize} // <--- Truyền vào đây
-                fetchEquipment={fetchEquipment}
+                //totalItems={totalItems} 
+                //currentPage={activePage}
+                //pageSize={pageSize} // <--- Truyền vào đây
+                //fetchEquipment={fetchEquipment}
                 onSave={handleSave} 
                 onDelete={handleDelete} 
                 user={user} 
