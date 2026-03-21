@@ -17,16 +17,29 @@ interface Props {
 export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, readOnly = false, defaultOpen = false }: Props) {
   const [open, setOpen] = useState(defaultOpen)
   const [localForm, setLocalForm] = useState<Equipment>({ ...eq })
-
+  const EMPTY_EQ = (): Equipment => ({
+    id: '', appmodel: '', opcond: 'Good', ctrlnum: '', eqtype: 'Winding',
+    location: 'Bắc Giang #1', person: '', instdate: '', value: '',
+    mfgname: '', eqtitle: '', model: '', serial: '', mfgdate: '',
+    weight: '', power: '', size: '', makeraddr: '',
+    periodicItems: [], inspections: [], spareParts: [],
+  })
   // Sync when external eq changes (after save)
   useEffect(() => {
-    if (!isNew) setLocalForm({ ...eq })
-  }, [eq, isNew])
+    if (!isNew && !open) {
+      setLocalForm({ ...eq })
+    }
+  }, [eq, isNew, open])
 
-  const handleSave = (data: Equipment) => {
-    onSave(data)
-    if (isNew) setOpen(false)
-  }
+  const handleSave = async (data: Equipment) => {
+  try {
+    await onSave(data); 
+    if (isNew) {
+      setOpen(false); // <--- ĐÂY CHÍNH LÀ LỆNH ĐÓNG FORM
+      setLocalForm(EMPTY_EQ()); 
+    }
+  } catch (error) { }
+};
 
   const handleDelete = (id: string) => {
     onDelete(id)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ConfigProvider, Layout, Menu, Badge, Button, App as AntApp, theme, Avatar, Space, Typography, Divider, Tooltip } from 'antd'
+import { ConfigProvider, Layout, Menu, Badge, Button, App as AntApp, theme, Avatar, Space, Typography, Divider, Tooltip, Spin } from 'antd'
 import { 
   Settings2, 
   ClipboardCheck, 
@@ -45,14 +45,15 @@ function AppInner() {
 
   // Tìm dòng 46 và sửa lại như sau:
 const { 
-  equipment, 
+  equipment = [], 
   loading, 
- // totalItems, 
-  //currentPage: activePage, // Đổi tên ở đây để tránh trùng lặp
-  //fetchEquipment,
+  totalCount, 
+  currentPage: activePage, // Đổi tên ở đây để tránh trùng lặp
+  fetchEquipment,
   saveEquipment, 
-  //pageSize,
-  deleteEquipment 
+  pageSize,
+  deleteEquipment ,
+  stats
 } = useEquipmentStore();
   const { message } = AntApp.useApp()
   
@@ -76,13 +77,7 @@ const {
     </div>
   )
 }
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500 font-semibold">
-        Đang tải danh sách thiết bị...
-      </div>
-    )
-  }
+
 
   const handleLogout = () => {
     if (confirm('Bạn có muốn đăng xuất khỏi hệ thống?')) {
@@ -274,22 +269,63 @@ const {
           </div>
         </Header>
 
-        {/* ── Content Area ── */}
-        <Content style={{ padding: '15px 20px', overflowY: 'auto' }}>
-          <div className="fade-in">
+        <Content style={{ padding: '15px 20px', overflowY: 'auto', position: 'relative', height: '100%' }}>
+  
+          {/* Layer Loading: Sử dụng fixed để luôn nằm giữa khung nhìn trình duyệt */}
+          {loading && (
+            <div style={{
+              position: 'fixed',    // Cố định so với cửa sổ trình duyệt
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',    // Giữa theo chiều dọc
+              justifyContent: 'center', // Giữa theo chiều ngang
+              zIndex: 9999,            // Luôn nằm trên cùng
+              backgroundColor: 'rgba(255, 255, 255, 0.3)', // Phủ mờ nhẹ nội dung phía dưới
+              pointerEvents: 'none'    // Cho phép cuộn xuyên qua lớp phủ nếu cần
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                background: 'white',
+                padding: '20px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)' // Tạo hiệu ứng nổi cho đẹp
+              }}>
+                <Spin size="large" />
+                <span style={{ marginTop: '10px', color: '#1890ff', fontWeight: 500 }}>
+                  Đang tải dữ liệu...
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Nội dung trang: Khi loading thì làm mờ và khóa tương tác */}
+          <div 
+            className="transition-all duration-200" 
+            style={{ 
+              opacity: loading ? 0.3 : 1,
+              filter: loading ? 'blur(2px)' : 'none',
+              pointerEvents: loading ? 'none' : 'auto' 
+            }}
+          >
             {view === 'list' && (
               <EquipmentListPage 
                 equipment={equipment} 
-                //totalItems={totalItems} 
-                //currentPage={activePage}
-                //pageSize={pageSize} // <--- Truyền vào đây
-                //fetchEquipment={fetchEquipment}
+                totalItems={totalCount}
+                stats={stats} 
+                currentPage={activePage}
+                pageSize={pageSize}
+                fetchEquipment={fetchEquipment}
                 onSave={handleSave} 
                 onDelete={handleDelete} 
                 user={user} 
               />
             )}
-            {view === 'fail'  && <FailurePage        equipment={equipment} user={user} />}
+            {view === 'fail' && <FailurePage equipment={equipment} user={user} />}
           </div>
         </Content>
       </Layout>

@@ -1,13 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Equipment } from '../types'
-import { exportToExcel } from '../utils/excelExport'
 import api from '../utils/api'
 import Swal from 'sweetalert2' // 1. Import SweetAlert2
 
 // 1. Export uid ngay tại đây để các file khác có thể import { uid }
 export const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-
-const SEED: Equipment[] = [];
 
 const dataURLtoFile = (dataUrl: string, filename: string) => {
   const arr = dataUrl.split(',')
@@ -42,13 +39,13 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
     appmodel: data.appliedModelName ?? data.appmodel ?? '',
     opcond: (data.operatingConditions ?? data.opcond ?? 'Good') as any,
     ctrlnum: data.controlNumber ?? data.ctrlnum ?? '',
-    eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? '',
+    eqtype: data.equipmentTitle ?? data.eqtype ?? '',
     location: data.installationLocation ?? data.location ?? '',
     person: data.responsiblePerson ?? data.person ?? '',
     instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : data.instdate ?? '',
     value: data.equipmentPrice != null ? String(data.equipmentPrice) : data.value ?? '',
     mfgname: data.manufacturerName ?? data.mfgname ?? '',
-    eqtitle: data.equipmentTitle ?? data.eqtitle ?? '',
+    eqtitle: data.manufacturerEquipmentTitle ?? data.eqtitle ?? '',
     model: data.model ?? data.manufacturerModel ?? '',
     serial: data.serialNo ?? data.serial ?? '',
     power: data.power ?? data.power ?? '',
@@ -223,42 +220,71 @@ const serverImages = (eq as any)._serverImages || [];
   return formData;
 }
 
-function loadFromStorage(): Equipment[] {
-  try {
-    const raw = localStorage.getItem('vt_equipment_v3')
-    const parsed = raw ? JSON.parse(raw) : null
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : SEED
-  } catch { return SEED }
-}
+
 
 export function useEquipmentStore() {
-  const [equipment, setEquipment] = useState<Equipment[]>(loadFromStorage)
+  const [equipment, setEquipment] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
-  const loadedOnce = useRef(false)
   const fetchingId = useRef<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const [stats, setStats] = useState({ good: 0, warn: 0, bad: 0 });
+ const fetchEquipment = useCallback(async (params: { 
+    page: number, 
+    pageSize?: number,
+    searchTerm?: string, 
+    location?: string, 
+    status?: string,
+    type?: string 
+  }) => {
+    if (equipment.length === 0) setLoading(true);
+    const finalPageSize = params.pageSize || pageSize;
+   try {
+      const res = await api.get('/Equipment', { 
+        params: { 
+          page: params.page, 
+          pageSize: finalPageSize, // Gửi lên Server
+          searchTerm: params.searchTerm,
+          location: params.location,
+          status: params.status,
+          type: params.type
+        } 
+      });
 
-  useEffect(() => {
-    if (loadedOnce.current) return
-    loadedOnce.current = true
+      // Map dữ liệu dựa trên cấu trúc PagedResult của Backend
+      const rawData = res.data.items || res.data.data || [];
+      const total = res.data.totalCount || 0;
+      const serverStats = res.data.stats; 
 
-    const fetchEquipment = async () => {
-      try {
-        const res = await api.get('/Equipment')
-        let list: any[] = []
-        if (Array.isArray(res.data)) list = res.data
-        else if (Array.isArray((res.data as any)?.data)) list = (res.data as any).data
-        else if (Array.isArray((res.data as any)?.items)) list = (res.data as any).items
-
-        const normalized = list.map(item => mapApiToEquipment(item))
-        if (normalized.length > 0) {
-          setEquipment(normalized)
-          localStorage.setItem('vt_equipment_v3', JSON.stringify(normalized))
-        }
-      } catch (err) { console.warn('Load API fail:', err) }
-      finally { setLoading(false) }
+      if (serverStats) {
+        setStats({
+          good: serverStats.good,
+          warn: serverStats.warning, // Lưu ý khớp key với BE
+          bad: serverStats.bad
+        });
+      }
+      const normalized = rawData.map((item: any) => mapApiToEquipment(item));
+      
+      setEquipment(normalized);
+      setTotalCount(total);
+      setCurrentPage(params.page);
+      if (params.pageSize) setPageSize(params.pageSize);
+    } catch (err) {
+      console.error('Load API fail:', err);
+    } finally {
+      setLoading(false);
     }
-    fetchEquipment()
-  }, [])
+  }, [pageSize, equipment.length]);
+
+ const isFirstRun = useRef(true);
+
+useEffect(() => {
+  if (isFirstRun.current) {
+    fetchEquipment({ page: 1 });
+    isFirstRun.current = false;
+  }
+}, [fetchEquipment]);
 
   // --- PHẦN SỬA 2: THÊM HÀM GET DETAIL ĐỂ LOAD DỮ LIỆU KHI BẤM VÀO ITEM ---
   const getDetail = useCallback(async (id: string) => {
@@ -279,14 +305,13 @@ export function useEquipmentStore() {
     }
   }, []);
 
-  const persist = useCallback((next: Equipment[]) => {
-    localStorage.setItem('vt_equipment_v3', JSON.stringify(next))
-    setEquipment(next)
-  }, [])
+  
 
 const saveEquipment = useCallback(async (eq: Equipment) => {
   try {
-    Swal.showLoading();
+
+    setLoading(true);
+    
     const isUpdate = Boolean(eq.id && !eq.id.includes('-'));
     let response;
 
@@ -326,7 +351,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
       }
       
       // 3. Đồng bộ bộ nhớ đệm
-      localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
+      //localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
       return [...next]; // Spread một lần nữa để chắc chắn địa chỉ mảng thay đổi
     });
 
@@ -334,16 +359,51 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
       icon: 'success',
       title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
       text: `Thiết bị ${updatedRecord.eqtitle} đã được cập nhật.`,
-      timer: 2000,
+      timer: 2500,
       showConfirmButton: false,
       toast: true,
       position: 'top-end'
     });
-
+    setLoading(false);
     return updatedRecord;
 
   } catch (error: any) {
-     // ... logic catch lỗi cũ của bạn giữ nguyên
+    //console.error("Save fail:", error);
+    setLoading(false);
+    let errorHtml = "";
+    const serverErrors = error.response?.data?.errors;
+
+    if (serverErrors) {
+      // 1. Duyệt qua object lỗi để xây dựng danh sách HTML
+      errorHtml = `<div style="text-align: left; font-size: 16px; ">
+        <ul style="margin-top: 10px;">
+          ${Object.entries(serverErrors)
+            .map(([field, messages]) => {
+              // messages là một mảng (theo cấu trúc ASP.NET)
+              const fieldMessages = Array.isArray(messages) ? messages : [messages];
+              return fieldMessages.map(msg => `<li style="margin-bottom: 5px;">${msg}</li>`).join('');
+            })
+            .join('')}
+        </ul>
+      </div>`;
+    } else {
+      // Fallback nếu không phải lỗi validation (lỗi 500, mất mạng, v.v.)
+      errorHtml = `<p>${error.response?.data?.title || error.message || "Đã có lỗi xảy ra."}</p>`;
+    }
+
+        // 2. Hiển thị Swal với tham số 'html' thay vì 'text'
+        setTimeout(() => {
+          Swal.fire({
+            icon: 'error',
+            title: 'Dữ liệu không hợp lệ',
+            html: errorHtml, // Sử dụng html để render danh sách <li>
+            confirmButtonText: 'Đã hiểu',
+            confirmButtonColor: 'rgb(29, 96, 241)',
+            width: '500px' // Tăng độ rộng để dễ đọc danh sách lỗi
+          });
+        }, 100);
+
+        return null;
   }
 }, [equipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
 
@@ -352,7 +412,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
   if (id.includes('-')) {
     setEquipment(prev => {
       const next = prev.filter(e => e.id !== id);
-      localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
+      //localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
       return next;
     });
     return;
@@ -360,7 +420,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
 
   const result = await Swal.fire({
     title: 'Bạn có chắc chắn?',
-    text: "Dữ liệu sẽ bị xóa vĩnh viễn trên Server!",
+    text: "Dữ liệu sẽ bị xóa!",
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: '#d33',
@@ -377,14 +437,14 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
 
       setEquipment(prev => {
         const next = prev.filter(e => String(e.id) !== String(id));
-        localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
+        //localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
         return next;
       });
       
       Swal.fire({
         title: 'Đã xóa!',
         icon: 'success',
-        timer: 1500,
+        timer: 2500,
         showConfirmButton: false,
         toast: true,
         position: 'top-end'
@@ -395,9 +455,17 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
     }
   }
 }, []);
-  const exportExcel = useCallback((data: Equipment[]) => {
-    exportToExcel(data, `VINATech_Equipment_${new Date().toISOString().slice(0, 10)}.xlsx`)
-  }, [])
 
-  return { equipment, loading, getDetail, saveEquipment, deleteEquipment, exportExcel, persist }
-}
+return { 
+    equipment, 
+    totalCount, 
+    currentPage, 
+    pageSize, 
+    
+    loading, 
+    fetchEquipment, 
+    saveEquipment, 
+    deleteEquipment,
+    stats ,
+    
+  };}

@@ -192,25 +192,26 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   const set = <K extends keyof Equipment>(key: K, val: Equipment[K]) =>
     setForm(f => ({ ...f, [key]: val }))
 
-  const handleSave = () => {
-    if (!form.eqtitle && !form.model && !form.appmodel) {
-      alert('Vui lòng điền ít nhất Tên thiết bị hoặc Model!')
-      return
+  const handleSave = async () => { // Thêm async ở đây
+  const cleanForm = { ...form };
+  cleanForm.periodicItems = (cleanForm.periodicItems || []).filter(i => 
+    i.interval || i.item || i.inspdate || i.content
+  );
+  cleanForm.spareParts = (cleanForm.spareParts || []).filter(i => 
+    i.name || i.partnum || i.qty || i.spec || i.failure || i.replacement || i.inspector || i.remarks
+  );
+  cleanForm.inspections = [];
+
+  try {
+    await onSave(cleanForm); 
+
+    if (isNew) {
+      setForm({ ...initialData }); 
     }
-    
-    // Clean empty arrays - giữ row nếu có bất kỳ field nào có giá trị
-    const cleanForm = { ...form };
-    cleanForm.periodicItems = (cleanForm.periodicItems || []).filter(i => 
-      i.interval || i.item || i.inspdate || i.content
-    );
-    cleanForm.spareParts = (cleanForm.spareParts || []).filter(i => 
-      i.name || i.partnum || i.qty || i.spec || i.failure || i.replacement || i.inspector || i.remarks
-    );
-    cleanForm.inspections = [];
-    
-    onSave(cleanForm)
-    if (isNew) setForm({ ...initialData })
+  } catch (error) {
+    console.error("Lỗi khi lưu form:", error);
   }
+};
 
   // Periodic Item Helpers
   const emptyPItem = () => ({ id: `p_${uid()}`, interval: '', item: '', inspdate: '', content: '' })
@@ -536,8 +537,8 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                             </td>
                           </tr>
                           <tr>
-                            <td className="bg-[#e5edd9] border-b border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Inspection Interval<br/>Chu kỳ KT</td>
-                            <td className="bg-[#e5edd9] border-b border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Periodic Inspection Items<br/>Các hạng mục KT định kỳ</td>
+                            <td className="bg-[#e5edd9] border-b border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Inspection Interval<br/>Chu kỳ kiểm tra</td>
+                            <td className="bg-[#e5edd9] border-b border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Periodic Inspection Items<br/>Các hạng mục kiểm tra định kỳ</td>
                           </tr>
                           {Array.from({ length: pRowCount }).map((_, i) => {
                             const p = getPItem(i);
@@ -562,7 +563,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
 
                           {/* --- Inspection History --- */}
                           <tr>
-                            <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Date of Insp.<br/>Ngày KT/SC</td>
+                            <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Date of Insp.<br/>Ngày kiểm tra/SC</td>
                             <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Inspection Details<br/>Nội dung kiểm tra / sự cố</td>
                           </tr>
                           {Array.from({ length: botRowCount }).map((_, i) => {
@@ -606,7 +607,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                           </tr>
                           <tr>
                             <td className="bg-[#e5edd9] border-b border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Part Name<br/>Tên linh kiện</td>
-                            <td className="bg-[#e5edd9] border-b border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Part Number<br/>Số hiệu LK</td>
+                            <td className="bg-[#e5edd9] border-b border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Part Number<br/>Số hiệu linh kiện</td>
                             <td className="bg-[#e5edd9] border-b border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Specification<br/>Quy cách</td>
                             <td className="bg-[#e5edd9] border-b border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Quantity<br/>Số Lượng</td>
                           </tr>
@@ -639,9 +640,9 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
 
                           {/* --- Failure / Repair History --- */}
                           <tr>
-                            <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Failure History<br/>Số Lượt Hỏng</td>
+                            <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Failure History<br/>Lịch sử hư hỏng</td>
                             <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Replacement Parts<br/>Linh kiện thay thế</td>
-                            <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Inspector<br/>Người KT</td>
+                            <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-r border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Inspector<br/>Người kiểm tra</td>
                             <td className="bg-[#e5edd9] border-b border-t-[2.5px] border-black text-[9.5px] font-bold text-center text-[#1a3811] uppercase py-1.5 px-1 leading-tight">Remarks<br/>Ghi chú</td>
                           </tr>
                           {Array.from({ length: botRowCount }).map((_, i) => {
