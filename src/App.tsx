@@ -168,7 +168,7 @@ const {
                     {n.label}
                     {n.key === 'list' && !collapsed && (
                       <Badge
-                        count={equipment.length}
+                        count={totalCount}
                         size="small"
                         style={{ marginLeft: 12, background: THEME_COLORS.primary, border: 'none', color: 'white' }}
                       />
@@ -237,6 +237,8 @@ const {
             top: 0,
             zIndex: 99,
             borderBottom: '1px solid #E5E7EB',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)', 
+            //borderBottom: '1px solid #e6f4ff', // Viền xanh nhạt
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

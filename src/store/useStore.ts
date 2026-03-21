@@ -105,16 +105,24 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
  const serverMeta: any[] = [];
   // Kiểm tra tất cả các trường có thể chứa ảnh
   const rawList = data.images || data.mainImages || data.equipmentImages || [];
-
+  mapped.photo1 = '';
+  mapped.photo2 = '';
   if (Array.isArray(rawList) && rawList.length > 0) {
     rawList.forEach((img: any) => {
-      const isRight = img.imageType === true || img.type === true || img.imageType === 1;
-      
-      serverMeta.push({ id: img.id, type: isRight });
+        // Kiểm tra logic xác định Trái/Phải
+        // true/1/true string -> Phải (photo2)
+        // false/0/false string -> Trái (photo1)
+        const isRight = img.imageType === true || img.type === true || img.imageType === 1;
+        
+        serverMeta.push({ id: img.id, type: isRight });
 
-      const url = formatUrl(img.imagePath || img.path || img.url);
-      if (isRight) mapped.photo2 = url; 
-      else mapped.photo1 = url;
+        const url = formatUrl(img.imagePath || img.path || img.url);
+        
+        if (isRight) {
+            mapped.photo2 = url; 
+        } else {
+            mapped.photo1 = url;
+        }
     });
   } 
   // Trường hợp Fallback: Nếu BE trả về mảng string đơn thuần (mainImagePath)
@@ -159,39 +167,39 @@ function buildDetailFormData(eq: Equipment, id: string): FormData {
   formData.append('Power', eq.power || '');
   formData.append('Size', eq.size || '');
 
-// --- LOGIC XỬ LÝ ẢNH (BẢN FIX TRIỆT ĐỂ) ---
-// KIỂM TRA QUAN TRỌNG: Log xem metadata có tồn tại không
+// --- LOGIC XỬ LÝ ẢNH (BẢN FIX CHỐNG NHÂN ĐÔI) ---
 const serverImages = (eq as any)._serverImages || [];
 
-  const processPhoto = (photo: string | null | undefined, isRight: boolean) => {
-    // Tìm ảnh gốc từ server dựa trên vị trí (Trái/Phải)
-    const original = serverImages.find((img: any) => img.type === isRight);
-    
-    const isNewUpload = isDataURL(photo); // Ảnh mới (base64)
-    const isRemoving = !photo || photo.trim() === ""; // Người dùng xóa ảnh
+const processPhoto = (photo: string | null | undefined, isRight: boolean) => {
+  const original = serverImages.find((img: any) => img.type === isRight);
+  const isNewUpload = isDataURL(photo); 
+  const hasPhoto = !!(photo && photo.trim() !== "");
 
-    // TH 1: NẾU CÓ THAY ĐỔI (Upload mới hoặc Xóa hẳn) -> Gửi lệnh xóa ảnh cũ
-    if (original && (isNewUpload || isRemoving)) {
-      // Quan trọng: Gửi key đơn giản 'DeletedImageIds', ASP.NET sẽ tự gom vào List<int>
+  // TRƯỜNG HỢP 1: THAY THẾ HOẶC THÊM MỚI (CHỈ KHI LÀ BASE64)
+  if (isNewUpload) {
+    // Nếu có ảnh cũ ở vị trí này trên server -> Đánh dấu xóa ảnh cũ
+    if (original) {
       formData.append('DeletedImageIds', String(original.id));
-      
     }
+    
+    // QUAN TRỌNG: Chỉ append vào ImageTypes KHI CÓ file tương ứng đi kèm
+    const file = dataURLtoFile(photo as string, `upload_${isRight ? 'Right' : 'Left'}.png`);
+    formData.append('files', file); 
+    formData.append('ImageTypes', isRight ? 'true' : 'false'); 
+  }
+  
+  // TRƯỜNG HỢP 2: XÓA ẢNH (Người dùng bấm nút Xóa trên giao diện)
+  else if (!hasPhoto && original) {
+    formData.append('DeletedImageIds', String(original.id));
+  }
 
-    // TH 2: UPLOAD ẢNH MỚI
-    if (isNewUpload) {
-      const file = dataURLtoFile(photo as string, `upload_${isRight ? 'Right' : 'Left'}.png`);
-      formData.append('files', file); // Tên phải khớp chính xác với List<IFormFile> ở Backend
-      formData.append('ImageTypes', isRight ? 'true' : 'false'); 
-      
-    }
+  // TRƯỜNG HỢP 3: GIỮ NGUYÊN (Ảnh là URL http...)
+  // Tuyệt đối KHÔNG append gì vào 'files' hay 'ImageTypes' ở đây.
+  // Backend sẽ giữ nguyên các bản ghi trong DB QLBH mà không có trong DeletedImageIds.
+};
 
-    // TH 3: GIỮ NGUYÊN ẢNH CŨ
-    // Nếu không có isNewUpload và photo vẫn tồn tại, KHÔNG append gì cả. 
-    // Backend sẽ tự hiểu là giữ nguyên các bản ghi không nằm trong DeletedImageIds.
-  };
-
-  processPhoto(eq.photo1, false); // Xử lý ảnh Trái (Type = false)
-  processPhoto(eq.photo2, true);  // Xử lý ảnh Phải (Type = true)
+processPhoto(eq.photo1, false); 
+processPhoto(eq.photo2, true);
 
   // PeriodicInspections - indexed form fields (ASP.NET [FromForm] binding)
   (eq.periodicItems || []).forEach((item, idx) => {
@@ -228,7 +236,7 @@ export function useEquipmentStore() {
   const fetchingId = useRef<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(8);
+  const [pageSize, setPageSize] = useState(10);
   const [stats, setStats] = useState({ good: 0, warn: 0, bad: 0 });
  const fetchEquipment = useCallback(async (params: { 
     page: number, 
@@ -236,7 +244,9 @@ export function useEquipmentStore() {
     searchTerm?: string, 
     location?: string, 
     status?: string,
-    type?: string 
+    type?: string,
+    startDate?: string, // Thêm dòng này
+    endDate?: string
   }) => {
     if (equipment.length === 0) setLoading(true);
     const finalPageSize = params.pageSize || pageSize;
@@ -244,11 +254,13 @@ export function useEquipmentStore() {
       const res = await api.get('/Equipment', { 
         params: { 
           page: params.page, 
-          pageSize: finalPageSize, // Gửi lên Server
+          pageSize: finalPageSize,
           searchTerm: params.searchTerm,
           location: params.location,
           status: params.status,
-          type: params.type
+          type: params.type,
+          startDate: params.startDate, 
+          endDate: params.endDate
         } 
       });
 
@@ -354,7 +366,10 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
       //localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
       return [...next]; // Spread một lần nữa để chắc chắn địa chỉ mảng thay đổi
     });
-
+    await fetchEquipment({ 
+      page: isUpdate ? currentPage : 1, // Nếu update thì ở lại trang cũ, nếu thêm mới thì về trang 1
+      pageSize: pageSize 
+    });
     Swal.fire({
       icon: 'success',
       title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
@@ -405,7 +420,7 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
 
         return null;
   }
-}, [equipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
+}, [currentPage, pageSize, fetchEquipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
 
   const deleteEquipment = useCallback(async (id: string) => {
   // Nếu là ID tạm (có dấu gạch ngang), chỉ cần xóa ở Local
@@ -434,10 +449,9 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
       
       // GỌI API XÓA THỰC TẾ (Giả định endpoint là /Equipment/{id})
       await api.delete(`/Equipment/${id}`); 
-
+      await fetchEquipment({ page: currentPage, pageSize: pageSize });
       setEquipment(prev => {
         const next = prev.filter(e => String(e.id) !== String(id));
-        //localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
         return next;
       });
       
