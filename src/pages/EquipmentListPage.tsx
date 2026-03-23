@@ -178,7 +178,7 @@ const handleSearch = (overrideParams?: any) => {
       >
         <div className="flex items-center justify-between mb-5"> 
           <div className="space-y-0">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"> 
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 text-green-600"> 
               <span className="w-1.5 h-6 bg-green-600 rounded-full inline-block" />
               Bộ lọc tìm kiếm
             </h2>

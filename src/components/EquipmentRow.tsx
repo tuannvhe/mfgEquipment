@@ -19,29 +19,41 @@ export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, read
   const [open, setOpen] = useState(defaultOpen)
   const [localForm, setLocalForm] = useState<Equipment>({ ...eq })
 
-  // 1. Kiểm tra xem dữ liệu có bị thay đổi so với bản gốc không
-  const isDirty = useMemo(() => {
-    // So sánh Object hiện tại với Object gốc truyền từ props
-    return JSON.stringify(localForm) !== JSON.stringify(eq);
-  }, [localForm, eq]);
-  const toggleOpen = () => {
-    if (open && isDirty) {
-      // Nếu đang mở và có thay đổi dữ liệu -> Cảnh báo
+const isDirty = useMemo(() => {
+  if (isNew || !open) return false;
+
+  // Hàm so sánh đơn giản nhưng bỏ qua các khác biệt về null/undefined/empty array
+  const checkDiff = (a: any, b: any) => {
+    const fields = ['ctrlnum', 'eqtype', 'model', 'serial', 'opcond', 'location', 'eqtitle', 'photo1', 'photo2'];
+    return fields.some(field => (a[field] || '') !== (b[field] || ''));
+  };
+
+  return checkDiff(localForm, eq);
+}, [localForm, eq, isNew, open]);
+
+ const toggleOpen = () => {
+  if (open) {
+    // Chỉ hiện Modal nếu thực sự có sự khác biệt giữa form đang sửa và bản gốc từ props
+    const hasChanged = JSON.stringify(localForm) !== JSON.stringify(eq);
+    
+    if (hasChanged) {
       Modal.confirm({
         title: 'Thay đổi chưa được lưu!',
         content: 'Bạn có chắc chắn muốn đóng không? Các thay đổi sẽ bị mất.',
         okText: 'Đóng và Bỏ qua',
         cancelText: 'Tiếp tục sửa',
         okType: 'danger',
+        centered: true,
         onOk: () => {
-          setLocalForm({ ...eq }); // Reset lại data về ban đầu
+          setLocalForm({ ...eq }); // Reset về bản gốc của cha
           setOpen(false);
         },
       });
-    } else {
-      setOpen(!open);
+      return;
     }
-  };
+  }
+  setOpen(!open);
+};
   const EMPTY_EQ = (): Equipment => ({
     id: '', appmodel: '', opcond: 'Good', ctrlnum: '', eqtype: '',
     location: 'Bắc Giang #1', person: '', instdate: '', value: '',
@@ -53,22 +65,28 @@ export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, read
     eq.opcond === 'Good' ? 'bg-emerald-500' : 
     eq.opcond === 'Warning' ? 'bg-amber-500' : 'bg-red-500';
   // Sync when external eq changes (after save)
-  useEffect(() => {
-    if (!isNew && !open) {
-      setLocalForm({ ...eq })
-    }
-  }, [eq, isNew, open])
+useEffect(() => {
+  // Khi props eq thay đổi (do cha cập nhật sau khi lưu), 
+  // ta phải đồng bộ localForm để JSON.stringify khớp nhau trở lại
+  setLocalForm({ ...eq });
+}, [eq]);
 
-  const handleSave = async (data: Equipment) => {
-    try {
-      await onSave(data);
-      // Sau khi lưu thành công, form không còn "bẩn" nữa vì eq (props) sẽ được cha cập nhật mới
-      if (isNew) {
-        setOpen(false);
-        setLocalForm(EMPTY_EQ());
-      }
-    } catch (error) { }
-  };
+ const handleSave = async (data: Equipment) => {
+  try {
+    await onSave(data);
+    
+    // BƯỚC QUAN TRỌNG: Cập nhật localForm bằng dữ liệu vừa lưu thành công
+    // để nó khớp hoàn toàn với dữ liệu mới từ props truyền xuống
+    setLocalForm({ ...data }); 
+
+    if (isNew) {
+      setOpen(false);
+      setLocalForm(EMPTY_EQ());
+    }
+  } catch (error) {
+    console.error("Lưu thất bại:", error);
+  }
+};
 
   const handleDelete = (id: string) => {
     onDelete(id)

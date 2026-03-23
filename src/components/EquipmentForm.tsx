@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  Button, Space, Tooltip, DatePicker, Image
+  Button, Space, Tooltip, DatePicker, Image, notification
 } from 'antd'
 import { Save, Trash2, Plus, X, Upload, Eraser, Printer, SearchIcon } from 'lucide-react'
 import type { Equipment } from '../types'
@@ -76,6 +76,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   const [form, setForm] = useState<Equipment>({ ...initialData })
   const printRef = useRef<HTMLDivElement>(null)
   const [isSaving, setIsSaving] = useState(false);
+  
   useEffect(() => {
     if (isNew || !initialData.id) return
 
@@ -271,16 +272,65 @@ const handleSave = async () => {
   const setInsp = (i: number, key: string, val: string) => {
     setSPart(i, key, val)
   }
-  // Image Upload Handler
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo1' | 'photo2') => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      set(field, ev.target?.result as string)
-    }
-    reader.readAsDataURL(file)
+
+const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo1' | 'photo2') => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const isImage = file.type.startsWith('image/');
+  if (!isImage) {
+    notification.error({
+      key: 'upload-error', 
+      message: 'Lỗi định dạng',
+      description: 'Vui lòng chọn tệp hình ảnh (JPG, PNG, WebP).',
+      placement: 'topRight',
+      duration: 4, 
+    });
+    e.target.value = '';
+    return;
   }
+
+  const isLt4M = file.size / 1024 / 1024 < 4;
+  if (!isLt4M) {
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+    
+    notification.warning({
+      key: 'upload-size-warning',
+      message: 'Ảnh quá lớn',
+      description: `Ảnh nặng ${fileSizeMB}MB. Vui lòng chọn ảnh dưới 4MB.`,
+      placement: 'topRight',
+      duration: 4, 
+      style: { borderLeft: '4px solid #faad14' }
+    });
+    
+    e.target.value = ''; 
+    return;
+  }
+
+  // 3. Xử lý đọc file và thông báo thành công
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    set(field, ev.target?.result as string);
+    
+    notification.success({
+      key: 'upload-success',
+      message: 'Tải ảnh thành công',
+      // description: `Đã cập nhật ảnh thành công`,
+      placement: 'topRight',
+      duration: 2, // Thành công thì biến mất nhanh hơn (2 giây)
+    });
+  };
+  
+  reader.onerror = () => {
+    notification.error({
+      message: 'Lỗi hệ thống',
+      description: 'Không thể đọc tệp tin này.',
+      duration: 3,
+    });
+  };
+
+  reader.readAsDataURL(file);
+};
 
   // Row Management Helpers
   const commonExtra = Math.max(extraP, extraS)
