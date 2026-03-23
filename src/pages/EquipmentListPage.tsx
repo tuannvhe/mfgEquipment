@@ -299,59 +299,59 @@ const handleSearch = (overrideParams?: any) => {
       </Card>
 
       {/* 3. PHẦN DANH SÁCH THIẾT BỊ */}
-<div className="pt-4">
-  <div className="flex items-center gap-2 mb-4 text-slate-600 font-bold px-2">
-    <List size={18} />
-    <span className="uppercase tracking-widest text-sm text-emerald-800 font-bold">
-      Danh sách hồ sơ thiết bị
-    </span>
-    {loading && <span className="ml-2 text-xs font-normal text-slate-400 animate-pulse">(Đang tải dữ liệu...)</span>}
-  </div>
-
-  <div className="space-y-4">
-    {/* Luôn hiện dòng Thêm mới nếu không phải ReadOnly */}
-    {!readOnly && (
-      <div className="group bg-blue-50/30 p-4 rounded-2xl border-2 border-dashed border-blue-100 hover:border-blue-300 transition-colors">
-        <EquipmentRow
-          key="fixed-add-new-row" 
-          eq={EMPTY_EQ()} 
-          isNew={true}
-          onSave={onSave}
-          onDelete={() => {}}
-        />
-      </div>
-    )}
-
-    {/* LOGIC CHÍNH: Ưu tiên Loading -> No Data -> List */}
-    {loading ? (
-      <div className="grid grid-cols-1 gap-3">
-        {[...Array(pageSize)].map((_, i) => (
-          <EquipmentSkeleton key={i} />
-        ))}
-      </div>
-    ) : equipment.length === 0 ? (
-      <div className="text-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
-        <div className="bg-white inline-block p-4 rounded-full shadow-sm mb-4">
-          <Search size={40} className="text-slate-200" />
+      <div className="pt-4">
+        <div className="flex items-center gap-2 mb-4 text-slate-600 font-bold px-2">
+          <List size={18} />
+          <span className="uppercase tracking-widest text-sm text-emerald-800 font-bold">
+            Danh sách hồ sơ thiết bị
+          </span>
+          {loading && <span className="ml-2 text-xs font-normal text-slate-400 animate-pulse">(Đang tải dữ liệu...)</span>}
         </div>
-        <p className="text-slate-500 font-medium italic">Không tìm thấy dữ liệu phù hợp</p>
-        <Button type="link" onClick={resetFilters}>Thử xóa bộ lọc</Button>
+
+        <div className="space-y-4">
+          {/* Luôn hiện dòng Thêm mới nếu không phải ReadOnly */}
+          {!readOnly && (
+            <div className="group bg-blue-50/30 p-4 rounded-2xl border-2 border-dashed border-blue-100 hover:border-blue-300 transition-colors">
+              <EquipmentRow
+                key="fixed-add-new-row" 
+                eq={EMPTY_EQ()} 
+                isNew={true}
+                onSave={onSave}
+                onDelete={() => {}}
+              />
+            </div>
+          )}
+
+          {/* LOGIC CHÍNH: Ưu tiên Loading -> No Data -> List */}
+          {loading ? (
+            <div className="grid grid-cols-1 gap-3">
+              {[...Array(pageSize)].map((_, i) => (
+                <EquipmentSkeleton key={i} />
+              ))}
+            </div>
+          ) : equipment.length === 0 ? (
+            <div className="text-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
+              <div className="bg-white inline-block p-4 rounded-full shadow-sm mb-4">
+                <Search size={40} className="text-slate-200" />
+              </div>
+              <p className="text-slate-500 font-medium italic">Không tìm thấy dữ liệu phù hợp</p>
+              <Button type="link" onClick={resetFilters}>Thử xóa bộ lọc</Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {equipment.map(eq => (
+                <EquipmentRow 
+                  key={eq.id} 
+                  eq={eq} 
+                  onSave={onSave} 
+                  onDelete={onDelete} 
+                  readOnly={readOnly} 
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    ) : (
-      <div className="grid grid-cols-1 gap-3">
-        {equipment.map(eq => (
-          <EquipmentRow 
-            key={eq.id} 
-            eq={eq} 
-            onSave={onSave} 
-            onDelete={onDelete} 
-            readOnly={readOnly} 
-          />
-        ))}
-      </div>
-    )}
-  </div>
-</div>
 
       {/* 4. Pagination - Việt hóa & Style */}
       <div className="flex justify-center py-8">
