@@ -67,7 +67,7 @@ export interface User {
   id: string
   username: string
   name: string
-  role: 'admin' | 'user' | 'staff'
+  role: string
   avatar?: string
 }
 
@@ -75,4 +75,5 @@ export interface AuthResponse {
   accessToken: string
   refreshToken: string
   user: User
+  role?: string
 }

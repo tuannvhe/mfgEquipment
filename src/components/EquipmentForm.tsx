@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import {
-  Button, Space, Tooltip, DatePicker
+  Button, Space, Tooltip, DatePicker, Image
 } from 'antd'
-import { Save, Trash2, Plus, X, Upload, Eraser, Printer } from 'lucide-react'
+import { Save, Trash2, Plus, X, Upload, Eraser, Printer, SearchIcon } from 'lucide-react'
 import type { Equipment } from '../types'
 import { uid } from '../store/useStore'
 import { useRef } from 'react'
@@ -15,10 +15,11 @@ const LOCATIONS = ['Bắc Giang #1', 'Bắc Giang #2', 'Bắc Ninh', 'Hà Nam', 
 interface Props {
   initialData: Equipment
   isNew: boolean
-  onSave: (eq: Equipment) => void
+  onSave: (eq: Equipment) => Promise<any>
   onDelete: (id: string) => void
   onCancel: () => void
   readOnly?: boolean
+  onChange?: (newData: Equipment) => void;
 }
 
 const TdLabel = ({ children, colSpan = 1, className = '' }: any) => (
@@ -70,11 +71,11 @@ const ExcelDatePicker = ({ value, onChange, className = '' }: any) => (
   />
 );
 
-export default function EquipmentForm({ initialData, isNew, onSave, onDelete, onCancel, readOnly = false }: Props) {
+export default function EquipmentForm({ initialData, isNew, onSave, onDelete, onCancel, onChange, readOnly = false }: Props) {
   const inputClass = readOnly ? 'read-only cursor-default' : ''
   const [form, setForm] = useState<Equipment>({ ...initialData })
   const printRef = useRef<HTMLDivElement>(null)
-
+  const [isSaving, setIsSaving] = useState(false);
   useEffect(() => {
     if (isNew || !initialData.id) return
 
@@ -192,24 +193,47 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   const set = <K extends keyof Equipment>(key: K, val: Equipment[K]) =>
     setForm(f => ({ ...f, [key]: val }))
 
-  const handleSave = async () => { // Thêm async ở đây
+const handleSave = async () => {
   const cleanForm = { ...form };
+  setIsSaving(true);
+  // 1. Lọc dữ liệu rỗng
   cleanForm.periodicItems = (cleanForm.periodicItems || []).filter(i => 
     i.interval || i.item || i.inspdate || i.content
   );
   cleanForm.spareParts = (cleanForm.spareParts || []).filter(i => 
     i.name || i.partnum || i.qty || i.spec || i.failure || i.replacement || i.inspector || i.remarks
   );
-  cleanForm.inspections = [];
 
   try {
-    await onSave(cleanForm); 
+    // 2. Gọi hàm save
+    const result = await onSave(cleanForm); 
 
-    if (isNew) {
-      setForm({ ...initialData }); 
+    // 3. KIỂM TRA KẾT QUẢ
+    if (!result) {
+      // Nếu Store trả về null (thất bại), dừng lại để user sửa tiếp
+      return; 
     }
+
+    // 4. NẾU THÀNH CÔNG
+    // Hiển thị thông báo thành công (ví dụ dùng antd message)
+    // message.success('Lưu hồ sơ thành công!');
+    console.log("Kết quả result:", result);
+    if (isNew) {
+      // Nếu là hồ sơ mới hoàn toàn, lưu xong thì đóng form "Thêm mới"
+      onCancel(); 
+    } else {
+      // Nếu là CHỈNH SỬA hồ sơ cũ:
+      // KHÔNG GỌI onCancel() ở đây nếu bạn muốn user ở lại xem tiếp.
+      // Thông thường, ta để user tự nhấn nút X (Cancel) hoặc 
+      // chỉ đóng khi bạn chắc chắn muốn kết thúc phiên chỉnh sửa.
+      console.log("Đang gọi onCancel để đóng form...");
+      //onCancel(); // <-- Comment dòng này nếu muốn giữ form lại sau khi Save
+    }
+    
   } catch (error) {
-    console.error("Lỗi khi lưu form:", error);
+    console.error("Lỗi runtime:", error);
+  }finally {
+    setIsSaving(false);
   }
 };
 
@@ -482,40 +506,63 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
                 <TdValue><ExcelInput value={form.size} onChange={(v: string) => set('size', v)} className={`font-mono ${inputClass}`} /></TdValue>
               </tr>
 
-              {/* === ROW 7 === */}
+              {/* === ROW 7: PHOTOS === */}
               <tr>
-                <TdValue colSpan={4} className="bg-[#f0f4eb] p-0 relative group/photo hover:bg-[#e6ebdf] transition-colors cursor-pointer border-black">
-                  <label className={`flex flex-col h-full min-h-[140px] w-full items-center justify-center ${readOnly ? 'cursor-default' : 'cursor-pointer'} m-0`}>
-                    {!readOnly && <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'photo1')} />}
-                    {form.photo1 ? (
-                      <div className="relative h-full w-full flex items-center justify-center bg-white">
-                        <img src={form.photo1} alt="Machine Photo 1" className="max-h-[136px] max-w-full object-contain z-10 p-1" />
-                        {!readOnly && <button onClick={(e) => { e.preventDefault(); set('photo1', ''); }} className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-600 text-white rounded flex items-center justify-center p-1.5 opacity-0 group-hover/photo:opacity-100 transition-opacity z-20 shadow-sm" title="Xóa ảnh này"><Trash2 size={16} /></button>}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center opacity-50 group-hover/photo:opacity-100 transition-opacity text-center px-4">
-                        <Upload size={24} className="mb-2 text-[#2d5f1b]" />
-                        <span className="text-[11px] font-bold text-[#2d5f1b] uppercase tracking-widest text-center px-4">{readOnly ? 'Chưa có ảnh' : 'Tải lên'}<br/>(Machine Photo)</span>
-                      </div>
-                    )}
-                  </label>
-                </TdValue>
-                <TdValue colSpan={4} className="bg-[#f0f4eb] border-l-0 p-0 relative group/photo hover:bg-[#e6ebdf] transition-colors cursor-pointer border-black">
-                  <label className={`flex flex-col h-full min-h-[140px] w-full items-center justify-center ${readOnly ? 'cursor-default' : 'cursor-pointer'} m-0`}>
-                    {!readOnly && <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, 'photo2')} />}
-                    {form.photo2 ? (
-                      <div className="relative h-full w-full flex items-center justify-center bg-white">
-                        <img src={form.photo2} alt="Machine Label Photo" className="max-h-[136px] max-w-full object-contain z-10 p-1" />
-                        {!readOnly && <button onClick={(e) => { e.preventDefault(); set('photo2', ''); }} className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-600 text-white rounded flex items-center justify-center p-1.5 opacity-0 group-hover/photo:opacity-100 transition-opacity z-20 shadow-sm" title="Xóa ảnh này"><Trash2 size={16} /></button>}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center opacity-50 group-hover/photo:opacity-100 transition-opacity text-center px-4">
-                        <Upload size={24} className="mb-2 text-[#2d5f1b]" />
-                        <span className="text-[11px] font-bold text-[#2d5f1b] uppercase tracking-widest text-center px-4">{readOnly ? 'Chưa có ảnh' : 'Tải Tem máy lên'}<br/>(Nameplate Photo)</span>
-                      </div>
-                    )}
-                  </label>
-                </TdValue>
+                {[
+                  { id: 'photo1', label: 'Machine Photo', val: form.photo1 },
+                  { id: 'photo2', label: 'Nameplate Photo', val: form.photo2 }
+                ].map((item, idx) => (
+                  <TdValue key={item.id} colSpan={4} className="bg-[#f0f4eb] p-0 relative group/photo border-black">
+                    <div className="relative h-full min-h-[160px] w-full flex items-center justify-center bg-white overflow-hidden">
+                      {item.val ? (
+                        <>
+                          {/* Ảnh hỗ trợ Preview (Zoom) */}
+                          <Image
+                            src={item.val}
+                            alt={item.label}
+                            className="max-h-[156px] w-auto object-contain p-1"
+                            preview={{
+                              mask: (
+                                <div className="flex flex-col items-center gap-1">
+                                  <SearchIcon size={20} />
+                                  <span className="text-xs">Xem chi tiết</span>
+                                </div>
+                              ),
+                            }}
+                          />
+                          
+                          {/* Nút chức năng khi hover (Xóa/Thay đổi) - Chỉ hiện khi không phải ReadOnly */}
+                          {!readOnly && (
+                            <div className="absolute bottom-2 right-2 flex gap-2 opacity-0 group-hover/photo:opacity-100 transition-opacity z-20">
+                              <label className="bg-emerald-600 hover:bg-emerald-700 text-white p-1.5 rounded shadow-lg cursor-pointer flex items-center justify-center" title="Thay đổi ảnh">
+                                <Upload size={14} />
+                                <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, item.id as any)} />
+                              </label>
+                              <button 
+                                onClick={(e) => { e.preventDefault(); set(item.id as any, ''); }}
+                                className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded shadow-lg flex items-center justify-center"
+                                title="Xóa ảnh"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        /* Trạng thái trống */
+                        <label className={`flex flex-col items-center justify-center w-full h-full transition-colors ${readOnly ? 'cursor-default' : 'cursor-pointer hover:bg-slate-50'}`}>
+                          {!readOnly && <input type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e, item.id as any)} />}
+                          <div className="opacity-40 flex flex-col items-center">
+                            <Upload size={28} className="mb-2 text-[#2d5f1b]" />
+                            <span className="text-[10px] font-bold text-[#2d5f1b] uppercase tracking-tighter px-4 text-center">
+                              {readOnly ? 'Không có hình ảnh' : `Tải lên ${item.label}`}
+                            </span>
+                          </div>
+                        </label>
+                      )}
+                    </div>
+                  </TdValue>
+                ))}
               </tr>
 
               {/* === ALL SECTIONS MERGED: LEFT (Periodic + Inspection) | RIGHT (Spare Parts + Repair) === */}

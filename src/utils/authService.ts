@@ -12,44 +12,58 @@ const parseJwt = (token: string): any | null => {
   }
 }
 
-const normalizeUser = (raw: any): User => ({
-  id: raw?.id?.toString() || raw?.sub?.toString() || 'unknown',
-  username: raw?.username || raw?.sub || 'unknown',
-  name: raw?.name || raw?.username || raw?.sub || 'Người dùng',
-  role: raw?.role === 'admin' ? 'admin' : raw?.role === 'staff' ? 'staff' : 'user',
-})
+const normalizeUser = (raw: any): User => {
+  
+  return {
+    id: raw?.id?.toString() || raw?.sub?.toString() || raw?.Id?.toString() || 'unknown',
+    username: raw?.username || raw?.sub || raw?.Username || 'unknown',
+    name: raw?.name || raw?.username || raw?.FullName || 'Người dùng',
+    role: raw?.role || raw?.Role || 'user',
+  };
+};
 
 export const authService = {
   login: async (username: string, password: string): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/Auth/login', { username, password })
+    const response = await api.post<AuthResponse>('/Auth/login', { username, password });
 
-    const { accessToken, refreshToken, user } = response.data
-    localStorage.setItem('access_token', accessToken)
-    localStorage.setItem('refresh_token', refreshToken)
+    const { accessToken, refreshToken, user } = response.data;
+    
+    // Lưu token ngay
+    if (accessToken) localStorage.setItem('access_token', accessToken);
+    if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
 
-    let finalUser: User | null = null
-    if (user) finalUser = normalizeUser(user)
+    let finalUser: User | null = null;
+
+    // Ưu tiên 1: Dữ liệu user object từ API trả về trực tiếp
+    if (user) {
+      finalUser = normalizeUser(user);
+    } 
+    // Ưu tiên 2: Giải mã từ JWT nếu API không trả về object user riêng
     else if (accessToken) {
-      const parsed = parseJwt(accessToken)
-      if (parsed) finalUser = normalizeUser(parsed)
+      const parsed = parseJwt(accessToken);
+      if (parsed) finalUser = normalizeUser(parsed);
     }
-
+    const apiData = response.data as any;
+  
+  // Kiểm tra mọi khả năng: role (viết thường) hoặc Role (viết hoa) từ Database
+  const fallbackRole = apiData.role || apiData.Role || apiData.user?.role || 'user';
+    // Ưu tiên 3: Fallback cuối cùng nếu cả 2 cách trên đều thất bại
     if (!finalUser) {
       finalUser = {
         id: 'unknown',
         username,
         name: username,
-        role: 'user',
-      }
+        role: fallbackRole, // Gán giá trị chuỗi cụ thể thay vì biến role không tồn tại
+      };
     }
 
-    localStorage.setItem('user_info', JSON.stringify(finalUser))
+    localStorage.setItem('user_info', JSON.stringify(finalUser));
 
     return {
       accessToken,
       refreshToken,
       user: finalUser,
-    }
+    };
   },
 
   logout: () => {

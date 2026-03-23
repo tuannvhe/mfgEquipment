@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ConfigProvider, Layout, Menu, Badge, Button, App as AntApp, theme, Avatar, Space, Typography, Divider, Tooltip, Spin } from 'antd'
+import { ConfigProvider, Layout, Menu, Badge, Button, App as AntApp, theme, Avatar, Space, Typography, Divider, Tooltip, Spin, Modal } from 'antd'
 import { 
   Settings2, 
   ClipboardCheck, 
@@ -17,10 +17,12 @@ import FailurePage       from './pages/FailurePage'
 import LoginPage         from './pages/LoginPage'
 import { authService }   from './utils/authService'
 import type { User }      from './types'
-
+import viVN from 'antd/locale/vi_VN';
+import dayjs from 'dayjs';
+import 'dayjs/locale/vi';
 const { Header, Sider, Content } = Layout
 const { Text, Title } = Typography
-
+dayjs.locale('vi');
 type ViewKey = 'list' | 'insp' | 'spare' | 'fail'
 
 const THEME_COLORS = {
@@ -79,25 +81,47 @@ const {
 }
 
 
-  const handleLogout = () => {
-    if (confirm('Bạn có muốn đăng xuất khỏi hệ thống?')) {
-      authService.logout()
-      setUser(null)
-    }
-  }
+const handleLogout = () => {
+  Modal.confirm({
+    title: 'Xác nhận đăng xuất',
+    icon: <LogOut size={22} className="text-red-500" />,
+    content: 'Bạn có chắc chắn muốn thoát khỏi hệ thống quản lý thiết bị?',
+    
+    // ĐƯA RA GIỮA MÀN HÌNH
+    centered: true, 
+    
+    okText: 'Đăng xuất',
+    cancelText: 'Hủy',
+    
+    // Tùy chỉnh thêm để đồng bộ giao diện
+    okButtonProps: { 
+      danger: true, 
+      className: 'rounded-xl h-10 font-bold' 
+    },
+    cancelButtonProps: { 
+      className: 'rounded-xl h-10 font-semibold' 
+    },
+    
+    // Style cho bản thân cái Modal (bo góc mạnh hơn)
+    className: 'custom-confirm-modal',
+    
+    onOk: () => {
+      authService.logout();
+      setUser(null);
+    },
+  });
+};
 
   const filteredNav = NAV.filter(n => !n.roles || n.roles.includes(user.role))
 
   const handleSave = async (eq: Parameters<typeof saveEquipment>[0]) => {
-    try {
-      await saveEquipment(eq)
-      //message.success('Đã lưu dữ liệu thành công!')
-    } catch (error) {
-      console.error('Lỗi lưu thiết bị:', error)
-      //message.error('Lưu thiết bị thất bại. Vui lòng thử lại.')
-    }
+  try {
+    const res = await saveEquipment(eq);
+    return res || true; // Đảm bảo trả về giá trị TRUTHY
+  } catch (err) {
+    return null; // Trả về FALSY khi lỗi
   }
-
+}
   const handleDelete = (id: string) => {
     deleteEquipment(id)
     //message.warning('Đã xóa bản ghi thiết bị')
@@ -168,7 +192,7 @@ const {
                     {n.label}
                     {n.key === 'list' && !collapsed && (
                       <Badge
-                        count={totalCount}
+                        //count={totalCount}
                         size="small"
                         style={{ marginLeft: 12, background: THEME_COLORS.primary, border: 'none', color: 'white' }}
                       />
@@ -225,22 +249,21 @@ const {
       }}>
         {/* Top Header */}
         <Header
-          style={{
-            background: 'white',
-            padding: '0 24px',
-            height: 60,
-            lineHeight: '60px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            position: 'sticky',
-            top: 0,
-            zIndex: 99,
-            borderBottom: '1px solid #E5E7EB',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)', 
-            //borderBottom: '1px solid #e6f4ff', // Viền xanh nhạt
-          }}
-        >
+  style={{
+    background: 'rgba(255, 255, 255, 0.8)', // Trong suốt 80%
+    backdropFilter: 'blur(10px)', // Làm mờ phía sau
+    padding: '0 24px',
+    height: 64,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
+    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+    boxShadow: '0 1px 4px rgba(0,21,41,0.08)',
+  }}
+>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Button
               type="text"
@@ -273,34 +296,36 @@ const {
 
         <Content style={{ padding: '15px 20px', overflowY: 'auto', position: 'relative', height: '100%' }}>
   
-          {/* Layer Loading: Sử dụng fixed để luôn nằm giữa khung nhìn trình duyệt */}
+         {/* Layer Loading: Sử dụng FIXED thay vì ABSOLUTE */}
           {loading && (
             <div style={{
-              position: 'fixed',    // Cố định so với cửa sổ trình duyệt
-              top: 0,
-              left: 0,
-              right: 0,
+              position: 'fixed', // Quan trọng nhất: Cố định với màn hình
+              top: 0, 
+              left: 0, 
+              right: 0, 
               bottom: 0,
+              background: 'rgba(243, 244, 246, 0.4)', // Giảm độ mờ xuống một chút cho nhẹ nhàng
+              zIndex: 9999, // Đảm bảo nằm trên cả Sidebar và Header
               display: 'flex',
-              alignItems: 'center',    // Giữa theo chiều dọc
-              justifyContent: 'center', // Giữa theo chiều ngang
-              zIndex: 9999,            // Luôn nằm trên cùng
-              backgroundColor: 'rgba(255, 255, 255, 0.3)', // Phủ mờ nhẹ nội dung phía dưới
-              pointerEvents: 'none'    // Cho phép cuộn xuyên qua lớp phủ nếu cần
+              justifyContent: 'center',
+              alignItems: 'center', // Căn giữa theo cả chiều ngang và dọc
+              backdropFilter: 'blur(4px)', // Tăng độ mờ nền để tập trung vào thông báo
             }}>
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center',
-                background: 'white',
-                padding: '20px',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)' // Tạo hiệu ứng nổi cho đẹp
-              }}>
-                <Spin size="large" />
-                <span style={{ marginTop: '10px', color: '#1890ff', fontWeight: 500 }}>
-                  Đang tải dữ liệu...
-                </span>
+              <div className="animate-in zoom-in duration-300">
+                <div className="p-8 bg-white/90 rounded-[2rem] shadow-2xl border border-white flex flex-col items-center min-w-[200px]">
+                  <Spin size="large" />
+                  <Text strong style={{ 
+                    marginTop: 20, 
+                    color: THEME_COLORS.primary,
+                    letterSpacing: '1px',
+                    fontSize: '17px'
+                  }}>
+                    ĐANG ĐỒNG BỘ HỆ THỐNG
+                  </Text>
+                  <Text style={{ fontSize: '13px', color: '#94a3b8', marginTop: 4 }}>
+                    Vui lòng đợi trong giây lát
+                  </Text>
+                </div>
               </div>
             </div>
           )}
@@ -338,6 +363,7 @@ const {
 export default function App() {
   return (
     <ConfigProvider
+    locale={viVN}
       theme={{
         algorithm: theme.defaultAlgorithm,
         token: {
@@ -352,12 +378,12 @@ export default function App() {
         components: {
           Menu: {
             darkItemBg: 'transparent',
-            darkItemSelectedBg: 'rgba(255, 255, 255, 0.1)',
+            darkItemSelectedBg: THEME_COLORS.primary, // Đổi màu nền xanh đậm hơn
             darkItemColor: 'rgba(255, 255, 255, 0.65)',
             darkItemSelectedColor: '#FFFFFF',
-            itemPaddingInline: 16,
-            itemBorderRadius: 12,
-            fontSize: 15,
+            itemMarginInline: 12, // Tạo khoảng cách với viền Sider
+            itemMarginBlock: 8,
+            itemBorderRadius: 10,
           },
           Table: {
             headerBg: '#F9FAFB',

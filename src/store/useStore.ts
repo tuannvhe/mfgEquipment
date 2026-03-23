@@ -5,7 +5,29 @@ import Swal from 'sweetalert2' // 1. Import SweetAlert2
 
 // 1. Export uid ngay tại đây để các file khác có thể import { uid }
 export const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-
+const Toast = Swal.mixin({
+  toast: true,
+  position: 'top-end',
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+  background: '#fff',
+  color: '#1e293b',
+  didOpen: (toast) => {
+    toast.addEventListener('mouseenter', Swal.stopTimer)
+    toast.addEventListener('mouseleave', Swal.resumeTimer)
+  }
+});
+const ModernAlert = Swal.mixin({
+  customClass: {
+    confirmButton: 'rounded-xl px-6 py-2.5 font-bold text-sm mx-2 transition-all hover:scale-105',
+    cancelButton: 'rounded-xl px-6 py-2.5 font-bold text-sm mx-2 transition-all hover:scale-105',
+    popup: 'rounded-[2rem] p-8 shadow-2xl border-none',
+    title: 'text-2xl font-extrabold text-slate-800',
+    htmlContainer: 'text-slate-500 font-medium'
+  },
+  buttonsStyling: true,
+});
 const dataURLtoFile = (dataUrl: string, filename: string) => {
   const arr = dataUrl.split(',')
   const mimeMatch = arr[0].match(/:(.*?);/)
@@ -39,13 +61,13 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
     appmodel: data.appliedModelName ?? data.appmodel ?? '',
     opcond: (data.operatingConditions ?? data.opcond ?? 'Good') as any,
     ctrlnum: data.controlNumber ?? data.ctrlnum ?? '',
-    eqtype: data.equipmentTitle ?? data.eqtype ?? '',
+    eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? '',
     location: data.installationLocation ?? data.location ?? '',
     person: data.responsiblePerson ?? data.person ?? '',
     instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : data.instdate ?? '',
     value: data.equipmentPrice != null ? String(data.equipmentPrice) : data.value ?? '',
     mfgname: data.manufacturerName ?? data.mfgname ?? '',
-    eqtitle: data.manufacturerEquipmentTitle ?? data.eqtitle ?? '',
+    eqtitle: data.equipmentTitle ?? data.eqtitle ?? '',
     model: data.model ?? data.manufacturerModel ?? '',
     serial: data.serialNo ?? data.serial ?? '',
     power: data.power ?? data.power ?? '',
@@ -187,15 +209,10 @@ const processPhoto = (photo: string | null | undefined, isRight: boolean) => {
     formData.append('files', file); 
     formData.append('ImageTypes', isRight ? 'true' : 'false'); 
   }
-  
-  // TRƯỜNG HỢP 2: XÓA ẢNH (Người dùng bấm nút Xóa trên giao diện)
+
   else if (!hasPhoto && original) {
     formData.append('DeletedImageIds', String(original.id));
   }
-
-  // TRƯỜNG HỢP 3: GIỮ NGUYÊN (Ảnh là URL http...)
-  // Tuyệt đối KHÔNG append gì vào 'files' hay 'ImageTypes' ở đây.
-  // Backend sẽ giữ nguyên các bản ghi trong DB QLBH mà không có trong DeletedImageIds.
 };
 
 processPhoto(eq.photo1, false); 
@@ -233,7 +250,6 @@ processPhoto(eq.photo2, true);
 export function useEquipmentStore() {
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
-  const fetchingId = useRef<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -248,7 +264,7 @@ export function useEquipmentStore() {
     startDate?: string, // Thêm dòng này
     endDate?: string
   }) => {
-    if (equipment.length === 0) setLoading(true);
+    setLoading(true);
     const finalPageSize = params.pageSize || pageSize;
    try {
       const res = await api.get('/Equipment', { 
@@ -264,7 +280,6 @@ export function useEquipmentStore() {
         } 
       });
 
-      // Map dữ liệu dựa trên cấu trúc PagedResult của Backend
       const rawData = res.data.items || res.data.data || [];
       const total = res.data.totalCount || 0;
       const serverStats = res.data.stats; 
@@ -272,7 +287,7 @@ export function useEquipmentStore() {
       if (serverStats) {
         setStats({
           good: serverStats.good,
-          warn: serverStats.warning, // Lưu ý khớp key với BE
+          warn: serverStats.warning, 
           bad: serverStats.bad
         });
       }
@@ -297,26 +312,6 @@ useEffect(() => {
     isFirstRun.current = false;
   }
 }, [fetchEquipment]);
-
-  // --- PHẦN SỬA 2: THÊM HÀM GET DETAIL ĐỂ LOAD DỮ LIỆU KHI BẤM VÀO ITEM ---
-  const getDetail = useCallback(async (id: string) => {
-    if (!id || id.includes('-') || fetchingId.current === id) return null;
-    fetchingId.current = id;
-    setLoading(true);
-    try {
-      const res = await api.get(`/Detail/${id}`);
-      const fullData = mapApiToEquipment(res.data);
-      setEquipment(prev => prev.map(e => e.id === id ? fullData : e));
-      return fullData;
-    } catch (err) {
-      console.error("Load detail fail:", err);
-      return null;
-    } finally {
-      setLoading(false);
-      fetchingId.current = null;
-    }
-  }, []);
-
   
 
 const saveEquipment = useCallback(async (eq: Equipment) => {
@@ -327,7 +322,6 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
     const isUpdate = Boolean(eq.id && !eq.id.includes('-'));
     let response;
 
-    // Phục hồi metadata
     const originalRecord = equipment.find(e => String(e.id) === String(eq.id));
     if (originalRecord && !(eq as any)._serverImages) {
       (eq as any)._serverImages = (originalRecord as any)._serverImages;
@@ -344,129 +338,97 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
     }
-
-    // --- PHẦN FIX: ĐẢM BẢO LOAD LẠI BẢNG ---
-    
-    // 1. Lấy dữ liệu thực tế từ Server trả về (Thường nằm trong response.data hoặc response.data.data)
     const rawData = response.data?.data || response.data;
     const updatedRecord = mapApiToEquipment(rawData);
 
-    // 2. Cập nhật State một cách tuyệt đối
     setEquipment(prev => {
       let next;
       if (isUpdate) {
-        // Thay thế bản ghi cũ dựa trên ID
         next = prev.map(e => String(e.id) === String(updatedRecord.id) ? updatedRecord : e);
       } else {
-        // Thêm mới vào đầu danh sách (Spread giúp React nhận diện mảng mới hoàn toàn)
         next = [updatedRecord, ...prev];
       }
-      
-      // 3. Đồng bộ bộ nhớ đệm
-      //localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
-      return [...next]; // Spread một lần nữa để chắc chắn địa chỉ mảng thay đổi
+      return [...next]; 
     });
-    await fetchEquipment({ 
-      page: isUpdate ? currentPage : 1, // Nếu update thì ở lại trang cũ, nếu thêm mới thì về trang 1
-      pageSize: pageSize 
-    });
-    Swal.fire({
+    await fetchEquipment({ page: currentPage, pageSize: pageSize });
+    Toast.fire({
       icon: 'success',
-      title: isUpdate ? 'Cập nhật thành công!' : 'Thêm mới thành công!',
-      text: `Thiết bị ${updatedRecord.eqtitle} đã được cập nhật.`,
-      timer: 2500,
-      showConfirmButton: false,
-      toast: true,
-      position: 'top-end'
+      title: isUpdate ? 'Đã cập nhật hồ sơ' : 'Đã thêm thiết bị mới',
+      text: updatedRecord.eqtype,
+      background: '#f0fdf4', // Nền xanh nhạt cực nhẹ
     });
     setLoading(false);
     return updatedRecord;
 
   } catch (error: any) {
-    //console.error("Save fail:", error);
     setLoading(false);
-    let errorHtml = "";
-    const serverErrors = error.response?.data?.errors;
-
-    if (serverErrors) {
-      // 1. Duyệt qua object lỗi để xây dựng danh sách HTML
-      errorHtml = `<div style="text-align: left; font-size: 16px; ">
-        <ul style="margin-top: 10px;">
-          ${Object.entries(serverErrors)
-            .map(([field, messages]) => {
-              // messages là một mảng (theo cấu trúc ASP.NET)
-              const fieldMessages = Array.isArray(messages) ? messages : [messages];
-              return fieldMessages.map(msg => `<li style="margin-bottom: 5px;">${msg}</li>`).join('');
-            })
-            .join('')}
-        </ul>
+  const serverErrors = error.response?.data?.errors;
+  
+  let errorContent = "";
+  if (serverErrors) {
+    errorContent = `
+      <div class="mt-4 space-y-2 text-left bg-red-50 p-4 rounded-2xl border border-red-100">
+        ${Object.values(serverErrors).flat().map(msg => `
+          <div class="flex items-start gap-2 text-red-600 text-sm">
+            <span class="mt-1.5 w-1.5 h-1.5 rounded-full bg-red-400 shrink-0"></span>
+            <span>${msg}</span>
+          </div>
+        `).join('')}
       </div>`;
-    } else {
-      // Fallback nếu không phải lỗi validation (lỗi 500, mất mạng, v.v.)
-      errorHtml = `<p>${error.response?.data?.title || error.message || "Đã có lỗi xảy ra."}</p>`;
-    }
+  }
 
-        // 2. Hiển thị Swal với tham số 'html' thay vì 'text'
-        setTimeout(() => {
-          Swal.fire({
-            icon: 'error',
-            title: 'Dữ liệu không hợp lệ',
-            html: errorHtml, // Sử dụng html để render danh sách <li>
-            confirmButtonText: 'Đã hiểu',
-            confirmButtonColor: 'rgb(29, 96, 241)',
-            width: '500px' // Tăng độ rộng để dễ đọc danh sách lỗi
-          });
-        }, 100);
+  ModernAlert.fire({
+    icon: 'error',
+    title: 'Kiểm tra lại dữ liệu',
+    html: errorContent || 'Đã có lỗi không xác định xảy ra.',
+    confirmButtonText: 'Tôi đã hiểu',
+    confirmButtonColor: '#10b981', // Màu xanh Primary của bạn
+  });
 
         return null;
   }
-}, [currentPage, pageSize, fetchEquipment]); // Dependency [equipment] rất quan trọng để React thấy được sự thay đổi
+}, [equipment]); 
 
   const deleteEquipment = useCallback(async (id: string) => {
-  // Nếu là ID tạm (có dấu gạch ngang), chỉ cần xóa ở Local
   if (id.includes('-')) {
     setEquipment(prev => {
       const next = prev.filter(e => e.id !== id);
-      //localStorage.setItem('vt_equipment_v3', JSON.stringify(next));
       return next;
     });
     return;
   }
 
-  const result = await Swal.fire({
-    title: 'Bạn có chắc chắn?',
-    text: "Dữ liệu sẽ bị xóa!",
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#d33',
-    confirmButtonText: 'Đồng ý xóa',
-    cancelButtonText: 'Hủy'
-  });
+  const result = await ModernAlert.fire({
+  title: 'Xác nhận xóa?',
+  text: "Hành động này không thể hoàn tác. Thiết bị sẽ bị loại khỏi hệ thống.",
+  icon: 'warning',
+  showCancelButton: true,
+  confirmButtonColor: '#ef4444',
+  cancelButtonColor: '#94a3b8',
+  confirmButtonText: 'Xóa thiết bị',
+  cancelButtonText: 'Quay lại',
+  reverseButtons: true, // Đưa nút Hủy sang trái, Xóa sang phải
+});
 
   if (result.isConfirmed) {
     try {
       Swal.showLoading();
       
-      // GỌI API XÓA THỰC TẾ (Giả định endpoint là /Equipment/{id})
       await api.delete(`/Equipment/${id}`); 
-      await fetchEquipment({ page: currentPage, pageSize: pageSize });
+
       setEquipment(prev => {
         const next = prev.filter(e => String(e.id) !== String(id));
         return next;
       });
       
-      Swal.fire({
-        title: 'Đã xóa!',
+      Toast.fire({
         icon: 'success',
-        timer: 2500,
-        showConfirmButton: false,
-        toast: true,
-        position: 'top-end'
+        title: 'Đã xóa thiết bị thành công',
+        background: '#fef2f2', 
       });
     } catch (err: any) {
       console.error("Delete fail:", err);
-      Swal.fire('Lỗi!', err.response?.data?.message || 'Không thể xóa thiết bị trên hệ thống.', 'error');
-    }
+      ModernAlert.fire('Thất bại', 'Không thể kết nối đến máy chủ để xóa.', 'error');    }
   }
 }, []);
 

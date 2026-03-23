@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Tag } from 'antd'
-import { ChevronRight, PlusCircle } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Tag, Modal } from 'antd'
+import { ChevronRight, MapPin, PlusCircle } from 'lucide-react'
 import type { Equipment } from '../types'
 import StatusBadge from './StatusBadge'
 import EquipmentForm from './EquipmentForm'
@@ -12,18 +12,46 @@ interface Props {
   onDelete: (id: string) => void
   readOnly?: boolean
   defaultOpen?: boolean
+  
 }
 
 export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, readOnly = false, defaultOpen = false }: Props) {
   const [open, setOpen] = useState(defaultOpen)
   const [localForm, setLocalForm] = useState<Equipment>({ ...eq })
+
+  // 1. Kiểm tra xem dữ liệu có bị thay đổi so với bản gốc không
+  const isDirty = useMemo(() => {
+    // So sánh Object hiện tại với Object gốc truyền từ props
+    return JSON.stringify(localForm) !== JSON.stringify(eq);
+  }, [localForm, eq]);
+  const toggleOpen = () => {
+    if (open && isDirty) {
+      // Nếu đang mở và có thay đổi dữ liệu -> Cảnh báo
+      Modal.confirm({
+        title: 'Thay đổi chưa được lưu!',
+        content: 'Bạn có chắc chắn muốn đóng không? Các thay đổi sẽ bị mất.',
+        okText: 'Đóng và Bỏ qua',
+        cancelText: 'Tiếp tục sửa',
+        okType: 'danger',
+        onOk: () => {
+          setLocalForm({ ...eq }); // Reset lại data về ban đầu
+          setOpen(false);
+        },
+      });
+    } else {
+      setOpen(!open);
+    }
+  };
   const EMPTY_EQ = (): Equipment => ({
-    id: '', appmodel: '', opcond: 'Good', ctrlnum: '', eqtype: 'Winding',
+    id: '', appmodel: '', opcond: 'Good', ctrlnum: '', eqtype: '',
     location: 'Bắc Giang #1', person: '', instdate: '', value: '',
     mfgname: '', eqtitle: '', model: '', serial: '', mfgdate: '',
     weight: '', power: '', size: '', makeraddr: '',
     periodicItems: [], inspections: [], spareParts: [],
   })
+  const statusColor = 
+    eq.opcond === 'Good' ? 'bg-emerald-500' : 
+    eq.opcond === 'Warning' ? 'bg-amber-500' : 'bg-red-500';
   // Sync when external eq changes (after save)
   useEffect(() => {
     if (!isNew && !open) {
@@ -32,84 +60,125 @@ export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, read
   }, [eq, isNew, open])
 
   const handleSave = async (data: Equipment) => {
-  try {
-    await onSave(data); 
-    if (isNew) {
-      setOpen(false); // <--- ĐÂY CHÍNH LÀ LỆNH ĐÓNG FORM
-      setLocalForm(EMPTY_EQ()); 
-    }
-  } catch (error) { }
-};
+    try {
+      await onSave(data);
+      // Sau khi lưu thành công, form không còn "bẩn" nữa vì eq (props) sẽ được cha cập nhật mới
+      if (isNew) {
+        setOpen(false);
+        setLocalForm(EMPTY_EQ());
+      }
+    } catch (error) { }
+  };
 
   const handleDelete = (id: string) => {
     onDelete(id)
     setOpen(false)
   }
 
-  return (
+return (
     <div
-      className={`rounded-2xl overflow-hidden bg-white transition-all duration-300 ${
-        open ? 'shadow-xl ring-2 ring-[#4C9C2E]/30' : 'shadow-sm border border-slate-200 hover:shadow-lg'
+      className={`group relative rounded-2xl overflow-hidden bg-white transition-all duration-300 ${
+        open 
+          ? 'shadow-2xl ring-1 ring-slate-200 my-4' 
+          : 'shadow-sm border border-slate-100 hover:border-blue-200 hover:shadow-md'
       }`}
     >
+      {/* 1. Dải màu trạng thái bên mép trái (Chỉ hiện khi không phải hàng thêm mới) */}
+      {!isNew && (
+        <div className={`absolute left-0 top-0 bottom-0 w-1 ${statusColor} opacity-70`} />
+      )}
+
       {/* ── Clickable header row ── */}
       <div
-        onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-4 px-5 py-2 cursor-pointer select-none transition-colors ${
-          open ? 'bg-[#f0f7f0]' : 'hover:bg-slate-50/50'
+        onClick={toggleOpen}
+        className={`flex items-center gap-4 px-6 py-4 cursor-pointer select-none transition-all ${
+          open ? 'bg-slate-50/80 border-b border-slate-100' : 'hover:bg-blue-50/30'
         }`}
       >
-        {/* Chevron */}
-        <span
-          className={`text-slate-400 transition-transform duration-300 ${open ? 'rotate-90' : ''}`}
-          style={{ lineHeight: 0 }}
-        >
-          <ChevronRight size={18} />
-        </span>
+        {/* Chevron với hiệu ứng xoay mượt và màu sắc nhấn */}
+        <div className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${open ? 'bg-blue-100 text-blue-600' : 'bg-slate-50 text-slate-400 group-hover:bg-white'}`}>
+          <ChevronRight size={18} className={`transition-transform duration-300 ${open ? 'rotate-90' : ''}`} />
+        </div>
 
         {isNew ? (
-          <span className="flex items-center gap-3 text-[#2d5f1b] font-bold text-[15px]">
-            <PlusCircle size={20} className="text-[#4C9C2E]" />
-            Thành lập hồ sơ thiết bị mới
-          </span>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
+              <PlusCircle size={20} />
+            </div>
+            <span className="text-green-700 font-bold text-[16px] tracking-tight">
+              Thêm hồ sơ thiết bị mới
+            </span>
+          </div>
         ) : (
           <>
-            {/* Main info */}
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-[15px] text-primaryDark truncate leading-snug">
-                {eq.eqtitle || eq.mfgname || 'Thiết bị không tên'}
+            {/* 2. Cải tiến Typography & Layout */}
+            <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+              
+              {/* Cột 1: Thông tin chính (Mã/Tên) */}
+              <div className="md:col-span-5">
+                <div className="flex items-center gap-2">
+                   <span className="text-[11px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                    {eq.ctrlnum || 'No ID'}
+                  </span>
+                  -
+                  <div className="font-bold text-[15px] text-green-800 truncate">
+                    {eq.eqtype || eq.mfgname || 'Thiết bị không tên'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                   <span className="text-[13px] text-slate-400 font-medium">{eq.model}</span>
+                   {eq.serial && (
+                     <>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-[12px] text-slate-400 font-mono italic">SN: {eq.serial}</span>
+                     </>
+                   )}
+                </div>
               </div>
-              <div className="font-mono text-[12px] text-primaryDark mt-1 flex gap-3 flex-wrap items-center">
-                <span className="bg-primary/10 px-2 py-0.5 rounded  italic">{eq.model || 'N/A'}</span>
-                {eq.serial && <span className="opacity-70">Serial: {eq.serial}</span>}
+
+              {/* Cột 2: Vị trí & Title */}
+              <div className="md:col-span-4 hidden sm:flex flex-wrap gap-2 items-center">
+                <Tag className="rounded-md border-none bg-blue-50 text-green-600 font-bold px-2 py-0.5 text-[11px]">
+                  {eq.eqtitle}
+                </Tag>
+                <div className="flex items-center gap-1.5 text-slate-500 text-[13px] font-medium">
+                  <MapPin size={13} className="text-slate-300" />
+                  {eq.location}
+                </div>
+              </div>
+
+              {/* Cột 3: Trạng thái & Ngày */}
+              <div className="md:col-span-3 flex items-center justify-end gap-4">
+                <StatusBadge status={eq.opcond} />
+                {eq.instdate && (
+                  <div className="hidden lg:flex flex-col items-end border-l border-slate-100 pl-4">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 leading-none">Ngày lắp</span>
+                    <span className="text-[12px] font-mono font-bold text-slate-600 mt-1">{eq.instdate}</span>
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Meta chips */}
-            <Tag color="#3d7a25" className="hidden sm:inline-block shrink-0 px-3 py-0.5 text-[12px] font-bold rounded-full border-none">
-              {eq.eqtype}
-            </Tag>
-            <span className="hidden md:inline text-[14px] text-slate-500 shrink-0 font-semibold">{eq.location}</span>
-            <StatusBadge status={eq.opcond} />
-            {eq.instdate && (
-              <span className="hidden lg:inline font-mono text-[12px] text-slate-400 shrink-0 border-l border-slate-200 pl-3">
-                {eq.instdate}
-              </span>
-            )}
           </>
+        )}
+        {isDirty && !isNew && (
+          <span className="text-[10px] bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full font-bold animate-pulse">
+            ĐANG CHỈNH SỬA
+          </span>
         )}
       </div>
 
-      {/* ── Expandable form ── */}
       {open && (
-        <EquipmentForm
+        <div className="animate-in slide-in-from-top-2 duration-300">
+          <EquipmentForm
           initialData={localForm}
           isNew={isNew}
           onSave={handleSave}
-          onDelete={handleDelete}
-          onCancel={() => setOpen(false)}
+          onDelete={handleDelete} // <--- THÊM DÒNG NÀY VÀO
+          onCancel={toggleOpen}
+          onChange={(newData) => setLocalForm(newData)}
           readOnly={readOnly}
         />
+        </div>
       )}
     </div>
   )
