@@ -389,48 +389,44 @@ const saveEquipment = useCallback(async (eq: Equipment) => {
   }
 }, [equipment]); 
 
-  const deleteEquipment = useCallback(async (id: string) => {
+// Thêm tham số title vào hàm
+const deleteEquipment = useCallback(async (id: string, title?: string) => {
   if (id.includes('-')) {
-    setEquipment(prev => {
-      const next = prev.filter(e => e.id !== id);
-      return next;
-    });
+    setEquipment(prev => prev.filter(e => e.id !== id));
     return;
   }
 
   const result = await ModernAlert.fire({
-  title: 'Xác nhận xóa?',
-  text: "Hành động này không thể hoàn tác. Thiết bị sẽ bị loại khỏi hệ thống.",
-  icon: 'warning',
-  showCancelButton: true,
-  confirmButtonColor: '#ef4444',
-  cancelButtonColor: '#94a3b8',
-  confirmButtonText: 'Xóa thiết bị',
-  cancelButtonText: 'Quay lại',
-  reverseButtons: true, // Đưa nút Hủy sang trái, Xóa sang phải
-});
+    title: 'Xác nhận xóa?',
+    // Chèn title vào nội dung thông báo
+    html: `Hành động này không thể hoàn tác.<br/>Thiết bị ${title || 'này'} sẽ bị loại khỏi hệ thống.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#ef4444',
+    cancelButtonColor: '#94a3b8',
+    confirmButtonText: 'Xóa thiết bị',
+    cancelButtonText: 'Quay lại',
+    reverseButtons: true,
+  });
 
   if (result.isConfirmed) {
     try {
-      Swal.showLoading();
-      
+      // Giữ nguyên logic xóa của bạn...
       await api.delete(`/Equipment/${id}`); 
-
-      setEquipment(prev => {
-        const next = prev.filter(e => String(e.id) !== String(id));
-        return next;
-      });
+      setEquipment(prev => prev.filter(e => String(e.id) !== String(id)));
       
       Toast.fire({
         icon: 'success',
-        title: 'Đã xóa thiết bị thành công',
+        title: `Đã xóa ${title || 'thiết bị'} thành công`,
         background: '#fef2f2', 
       });
     } catch (err: any) {
       console.error("Delete fail:", err);
-      ModernAlert.fire('Thất bại', 'Không thể kết nối đến máy chủ để xóa.', 'error');    }
+      ModernAlert.fire('Thất bại', 'Không thể kết nối đến máy chủ để xóa.', 'error');
+    }
   }
 }, []);
+
 
 return { 
     equipment, 

@@ -113,12 +113,14 @@ export default function EquipmentListPage({
     endDate: finalDates ? finalDates[1] : undefined,
   });
 };
-  const statCards = [
-    { label: 'Tổng thiết bị', val: totalItems, border: 'border-l-[#2d5f1b]', num: 'text-[#2d5f1b]', Icon: Settings2, bg: 'bg-[#f0f4f0]' },
-    { label: 'Hoạt động tốt', val: stats.good,  border: 'border-l-emerald-600', num: 'text-emerald-600', Icon: CheckCircle2, bg: 'bg-emerald-50' },
-    { label: 'Theo dõi',  val: stats.warn,  border: 'border-l-amber-500',  num: 'text-amber-500',  Icon: AlertCircle, bg: 'bg-amber-50' },
-    { label: 'Hỏng / Sửa chữa',   val: stats.bad,   border: 'border-l-red-600',     num: 'text-red-600',   Icon: XCircle, bg: 'bg-red-50' },
-  ]
+
+// Thêm vào array statCards các cặp màu gradient
+const statCards = [
+  { label: 'Tổng thiết bị', val: totalItems, color: 'from-blue-600 to-blue-400', Icon: Settings2, shadow: 'shadow-blue-200' },
+  { label: 'Hoạt động tốt', val: stats.good, color: 'from-emerald-600 to-teal-400', Icon: CheckCircle2, shadow: 'shadow-emerald-200' },
+  { label: 'Theo dõi', val: stats.warn, color: 'from-amber-500 to-orange-300', Icon: AlertCircle, shadow: 'shadow-amber-200' },
+  { label: 'Hỏng / Sửa chữa', val: stats.bad, color: 'from-rose-600 to-red-400', Icon: XCircle, shadow: 'shadow-red-200' },
+]
 
 const resetFilters = () => {
   // 1. Reset các state về giá trị ban đầu
@@ -152,27 +154,33 @@ const handleSearch = (overrideParams?: any) => {
       {/* 1. Stat Cards - Giữ nguyên logic nhưng thêm chút shadow hover */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map((s, i) => (
-          <div key={i} className={`${s.bg} rounded-2xl border border-slate-200 border-l-4 ${s.border} p-4 shadow-sm hover:shadow-md transition-shadow flex items-center gap-3`}>
-            <div>
-              <div className={`text-3xl font-extrabold leading-none ${s.num}`}>{s.val}</div>
-              <div className="text-[12px] text-slate-500 mt-2 font-bold uppercase tracking-widest">{s.label}</div>
-            </div>
-            <s.Icon size={32} className={`ml-auto opacity-20 ${s.num}`} />
-          </div>
-        ))}
+    <div key={i} className={`relative overflow-hidden group bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:-translate-y-1 transition-all duration-300 ${s.shadow} hover:shadow-xl`}>
+      {/* Lớp nền trang trí */}
+      <div className={`absolute -right-4 -top-4 w-24 h-24 bg-gradient-to-br ${s.color} opacity-[0.05] rounded-full group-hover:scale-150 transition-transform duration-500`} />
+      
+      <div className="relative flex flex-col gap-1">
+        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-white mb-2 shadow-lg`}>
+          <s.Icon size={20} />
+        </div>
+        <div className="text-3xl font-black text-slate-800 tracking-tight">{s.val}</div>
+        <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">{s.label}</div>
+      </div>
+    </div>
+  ))}
       </div>
 
       <Card 
-        className="shadow-md shadow-slate-200/50 border-none rounded-3xl overflow-hidden"
-        styles={{ body: { padding: '20px 24px' } }}
+        className="border-none rounded-[32px] bg-white/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-100"
+        styles={{ body: { padding: '24px' } }}
       >
-        <div className="flex items-center justify-between mb-5"> 
-          <div className="space-y-0">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 text-green-600"> 
-              <span className="w-1.5 h-6 bg-green-600 rounded-full inline-block" />
-              Bộ lọc tìm kiếm
-            </h2>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-green-100 rounded-lg text-green-600">
+            <Settings2 size={20} />
           </div>
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">
+            Bộ lọc thông minh
+          </h2>
+          <div className="h-px flex-1 bg-gradient-to-r from-slate-100 to-transparent ml-4" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"> 
@@ -256,12 +264,10 @@ const handleSearch = (overrideParams?: any) => {
           <div className="flex items-center gap-2">
             <Button 
               type="primary" 
-              size="middle"
-              icon={<Search size={16} />} 
               onClick={() => handleSearch()}
-              className="bg-green-600 hover:bg-green-700 h-9 px-6 font-semibold rounded-xl shadow-md shadow-green-100 border-none flex items-center"
+              className="h-11 px-8 font-black rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 border-none shadow-[0_10px_20px_-10px_rgba(22,163,74,0.5)] hover:shadow-[0_15px_25px_-5px_rgba(22,163,74,0.6)] hover:scale-[1.02] active:scale-95 transition-all"
             >
-              LỌC DỮ LIỆU
+              TÌM KIẾM NGAY
             </Button>
             {(q || fLoc || fStatus || fDates) && (
               <Button 
@@ -317,33 +323,39 @@ const handleSearch = (overrideParams?: any) => {
 
           {/* LOGIC CHÍNH: Ưu tiên Loading -> No Data -> List */}
           {loading ? (
-            <div className="grid grid-cols-1 gap-3">
-              {[...Array(pageSize)].map((_, i) => (
-                <EquipmentSkeleton key={i} />
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3">
-              {equipment.length === 0 ? (
-                <div className="text-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
-                  {/* ... UI Empty ... */}
-                </div>
-              ) : (
-                equipment.map(eq => (
-                  <EquipmentRow 
-                    key={eq.id} 
-                    eq={eq} 
-                    onSave={onSave} 
-                    onDelete={onDelete} 
-                    readOnly={readOnly} 
-                  />
-                ))
-              )}
-            </div>
-          )}
+              <div className="grid grid-cols-1 gap-3">
+                {[...Array(pageSize)].map((_, i) => (
+                  <EquipmentSkeleton key={i} />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {/* Sửa lại đoạn này để đảm bảo luôn return JSX */}
+                {equipment.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 bg-slate-50/50 rounded-[40px] border-2 border-dashed border-slate-100">
+                    <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-xl mb-6 animate-bounce">
+                      <Search size={40} className="text-slate-300" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800">Không tìm thấy kết quả</h3>
+                    <p className="text-slate-500 mt-2">Hãy thử thay đổi từ khóa hoặc bộ lọc của bạn</p>
+                    <Button onClick={resetFilters} className="mt-6 rounded-xl font-bold">Xóa tất cả lọc</Button>
+                  </div>
+                ) : (
+                  equipment.map(eq => (
+                    <EquipmentRow 
+                      key={eq.id} 
+                      eq={eq} 
+                      onSave={onSave} 
+                      onDelete={onDelete} 
+                      readOnly={readOnly} 
+                    />
+                  ))
+                )}
+              </div>
+            )}
         </div>
       </div>
-
+          
       {/* 4. Pagination - Việt hóa & Style */}
       <div className="flex justify-center py-8">
         <Pagination
@@ -368,6 +380,7 @@ const handleSearch = (overrideParams?: any) => {
             )}
           />
       </div>
+      
     </div>
-  )
-}
+); // Kết thúc return
+} // Kết thúc function
