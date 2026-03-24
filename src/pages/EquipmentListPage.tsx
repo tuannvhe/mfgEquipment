@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import dayjs from 'dayjs' 
 import type { TimeRangePickerProps} from 'antd';
+import api from '../utils/api'
+import { exportToExcel } from '../utils/excelExport'; // Thay đổi đường dẫn cho đúng với cấu trúc thư mục của bạn
 
 const { RangePicker } = DatePicker;
 const LOCATIONS = ['Bắc Giang #1', 'Bắc Giang #2', 'Bắc Ninh', 'Hà Nam', 'Hưng Yên']
@@ -86,6 +88,7 @@ export default function EquipmentListPage({
   { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
   { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
 ];
+
 
   // Hàm trung tâm để gọi dữ liệu từ Server
  const updateData = (params: { 
@@ -275,14 +278,15 @@ const handleSearch = (overrideParams?: any) => {
               </Button>
             )}
           </div>
-
-          <Button 
+          {/* <Button 
             size="middle"
             icon={<Download size={16} />} 
+            // Gọi hàm export và truyền mảng equipment hiện tại vào
+            onClick={() => exportToExcel(equipment, `Danh_sach_thiet_bi_${dayjs().format('YYYYMMDD')}.xlsx`)}
             className="h-9 border-slate-200 text-slate-600 hover:text-emerald-600 rounded-xl px-4 flex items-center font-medium bg-slate-50/50"
           >
             Xuất Excel
-          </Button>
+          </Button> */}
         </div>
       </Card>
 

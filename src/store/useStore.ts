@@ -61,13 +61,13 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
     appmodel: data.appliedModelName ?? data.appmodel ?? '',
     opcond: (data.operatingConditions ?? data.opcond ?? 'Good') as any,
     ctrlnum: data.controlNumber ?? data.ctrlnum ?? '',
-    eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? '',
+    eqtype: data.equipmentTitle ?? data.eqtype ?? '',
     location: data.installationLocation ?? data.location ?? '',
     person: data.responsiblePerson ?? data.person ?? '',
     instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : data.instdate ?? '',
     value: data.equipmentPrice != null ? String(data.equipmentPrice) : data.value ?? '',
     mfgname: data.manufacturerName ?? data.mfgname ?? '',
-    eqtitle: data.equipmentTitle ?? data.eqtitle ?? '',
+    eqtitle: data.manufacturerEquipmentTitle ?? data.eqtitle ?? '',
     model: data.model ?? data.manufacturerModel ?? '',
     serial: data.serialNo ?? data.serial ?? '',
     power: data.power ?? data.power ?? '',
@@ -175,13 +175,13 @@ function buildDetailFormData(eq: Equipment, id: string): FormData {
   formData.append('AppliedModelName', eq.appmodel || '');
   formData.append('OperatingConditions', eq.opcond || 'Good');
   formData.append('ControlNumber', eq.ctrlnum || '');
-  formData.append('EquipmentTitle', eq.eqtitle || '');
+  formData.append('ManufacturerEquipmentTitle', eq.eqtitle || '');
   formData.append('EquipmentPrice', eq.value || '0');
   formData.append('InstallationLocation', eq.location || '');
   formData.append('DateOfInstallation', eq.instdate || '');
   formData.append('ResponsiblePerson', eq.person || '');
   formData.append('ManufacturerName', eq.mfgname || '');
-  formData.append('ManufacturerEquipmentTitle', eq.eqtype || '');
+  formData.append('EquipmentTitle', eq.eqtype || '');
   formData.append('ManufacturerModel', eq.model || '');
   formData.append('SerialNo', eq.serial || '');
   formData.append('DateOfManufacture', eq.mfgdate || '');

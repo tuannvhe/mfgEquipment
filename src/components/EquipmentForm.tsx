@@ -11,6 +11,9 @@ import dayjs from 'dayjs'
 import api from '../utils/api'
 
 const LOCATIONS = ['Bắc Giang #1', 'Bắc Giang #2', 'Bắc Ninh', 'Hà Nam', 'Hưng Yên']
+import { QRCodeSVG } from 'qrcode.react';
+import { Modal } from 'antd'; // Đã có Button, Space... ở trên
+import { QrCode, Download } from 'lucide-react';
 
 interface Props {
   initialData: Equipment
@@ -76,7 +79,8 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   const [form, setForm] = useState<Equipment>({ ...initialData })
   const printRef = useRef<HTMLDivElement>(null)
   const [isSaving, setIsSaving] = useState(false);
-  
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const qrPrintRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (isNew || !initialData.id) return
 
@@ -185,7 +189,34 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
     contentRef: printRef,
     documentTitle: `Ho_so_thiet_bi_${form.ctrlnum || form.id}`,
   })
+ const downloadQR = () => {
+  // Sửa lỗi 2352: Ép kiểu qua unknown trước khi sang SVGElement
+  const svg = document.getElementById('equipment-qr') as unknown as SVGElement;
   
+  if (svg) {
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    
+    // Sửa lỗi 2554 & 7009: Sử dụng document.createElement('img') 
+    // để tránh xung đột với các định nghĩa Image khác trong project
+    const img = document.createElement('img');
+    
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx?.drawImage(img, 0, 0);
+      const pngFile = canvas.toDataURL("image/png");
+      const downloadLink = document.createElement("a");
+      downloadLink.download = `QR_${form.ctrlnum || 'Equipment'}.png`;
+      downloadLink.href = pngFile;
+      downloadLink.click();
+    };
+
+    // Sử dụng encodeURIComponent để xử lý các ký tự đặc biệt trong SVG an toàn hơn
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+  }
+};
   // Track extra rows manually to allow user to add more rows via button
   const [extraP, setExtraP] = useState(0)
   const [extraS, setExtraS] = useState(0)
@@ -201,11 +232,16 @@ const set = <K extends keyof Equipment>(key: K, val: Equipment[K]) => {
     onChange(updatedForm);
   }
 };
-
+const handlePrintQR = useReactToPrint({
+  contentRef: qrPrintRef, // Phải khớp với ref ở div bên dưới
+  documentTitle: `QR_Code_${form.ctrlnum || form.id}`,
+  // Có thể thêm print: true để nó tự mở dialog in ngay
+});
 const handleSave = async () => {
   const cleanForm = { ...form };
   setIsSaving(true);
-  // 1. Lọc dữ liệu rỗng
+  
+  // 1. Dọn dẹp dữ liệu trước khi gửi
   cleanForm.periodicItems = (cleanForm.periodicItems || []).filter(i => 
     i.interval || i.item || i.inspdate || i.content
   );
@@ -214,38 +250,30 @@ const handleSave = async () => {
   );
 
   try {
-    // 2. Gọi hàm save
-    const result = await onSave(cleanForm); 
+    // 2. onSave nên trả về data đã lưu từ Server
+    const savedData = await onSave(cleanForm); 
 
-    // 3. KIỂM TRA KẾT QUẢ
-    if (!result) {
-      // Nếu Store trả về null (thất bại), dừng lại để user sửa tiếp
-      return; 
+    if (savedData) {
+      // 3. Cập nhật lại form bằng dữ liệu chuẩn từ Server
+      // Việc này giúp localForm khớp 100% với props 'eq' ở component cha
+      setForm({ ...savedData });
+      
+      if (onChange) {
+        onChange(savedData);
+      }
+      
+      notification.success({ message: 'Lưu thành công' });
     }
 
-    // 4. NẾU THÀNH CÔNG
-    // Hiển thị thông báo thành công (ví dụ dùng antd message)
-    // message.success('Lưu hồ sơ thành công!');
-    console.log("Kết quả result:", result);
     if (isNew) {
-      // Nếu là hồ sơ mới hoàn toàn, lưu xong thì đóng form "Thêm mới"
       onCancel(); 
-    } else {
-      // Nếu là CHỈNH SỬA hồ sơ cũ:
-      // KHÔNG GỌI onCancel() ở đây nếu bạn muốn user ở lại xem tiếp.
-      // Thông thường, ta để user tự nhấn nút X (Cancel) hoặc 
-      // chỉ đóng khi bạn chắc chắn muốn kết thúc phiên chỉnh sửa.
-      console.log("Đang gọi onCancel để đóng form...");
-      //onCancel(); // <-- Comment dòng này nếu muốn giữ form lại sau khi Save
     }
-    
   } catch (error) {
-    console.error("Lỗi runtime:", error);
-  }finally {
+    console.error("Lỗi:", error);
+  } finally {
     setIsSaving(false);
   }
 };
-
   // Periodic Item Helpers
   const emptyPItem = () => ({ id: `p_${uid()}`, interval: '', item: '', inspdate: '', content: '' })
   const getPItem = (i: number) => form.periodicItems?.[i] || emptyPItem()
@@ -414,6 +442,17 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
           {isNew ? 'TẠO MỚI HỒ SƠ THIẾT BỊ (MFG. EQUIPMENT RECORD)' : 'CHỈNH SỬA HỒ SƠ THIẾT BỊ'}
         </span>
         <Space size="middle">
+          {!isNew && (
+            <Button
+              size="small"
+              icon={<QrCode size={14} />}
+              onClick={() => setIsQRModalOpen(true)}
+              className='rounded-lg shadow-sm border-blue-500 text-blue-600 hover:!border-blue-600 hover:!text-blue-700'
+              style={{ fontSize: 13 }}
+            >
+              Mã QR
+            </Button>
+          )}
           {!isNew && !readOnly && (
             <Button
               size="small"
@@ -432,7 +471,7 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
           {isNew ? (
             <Button size="small" onClick={onCancel} style={{ fontSize: 13 }} className='rounded-lg hover:bg-slate-50'>Hủy bỏ</Button>
           ) : null}
-          {!isNew && (
+          {/* {!isNew && (
             <Button
               size="small"
               icon={<Printer size={14} />}
@@ -442,7 +481,7 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
             >
               In Hồ Sơ (A4)
             </Button>
-          )}
+          )} */}
           {!readOnly && (
             <Button
               size="small"
@@ -797,7 +836,54 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
 
             </tbody>
           </table>
-
+          <Modal
+            title="Mã QR Thiết Bị"
+            open={isQRModalOpen}
+            onCancel={() => setIsQRModalOpen(false)}
+            footer={[
+              // Nút In mới
+              <Button 
+                key="print" 
+                icon={<Printer size={14} />} 
+                onClick={() => handlePrintQR()} // Gọi hàm in
+                className="border-amber-500 text-amber-600"
+              >
+                In mã QR
+              </Button>,
+              <Button key="download" icon={<Download size={14} />} onClick={downloadQR} type="primary">
+                Tải xuống PNG
+              </Button>,
+              // <Button key="close" onClick={() => setIsQRModalOpen(false)}>
+              //   Đóng
+              // </Button>
+            ]}
+            centered
+            width={350}
+          >
+            {/* Bọc nội dung cần in vào div này */}
+            <div ref={qrPrintRef} className="qr-print-container flex flex-col items-center justify-center bg-white">
+              {/* Thêm style inline để kiểm soát kích thước khi in */}
+              <div style={{ width: '100%', maxWidth: '250px', margin: '0 auto' }}>
+                <QRCodeSVG
+                  id="equipment-qr"
+                  // window.location.origin sẽ lấy domain hiện tại (ví dụ: http://192.168.1.50:3000)
+                  // Thêm mode=print để trang nhận diện lệnh in tự động
+                  value={`${window.location.origin}/equipment/view/${form.id}?mode=print`}
+                  size={512}
+                  level="H"
+                  includeMargin={true}
+                  style={{ width: '100%', height: 'auto' }}
+                />
+              </div>
+              <div className="text-center mt-2">
+                {/* Tăng cỡ chữ để khi in ra tem nhỏ vẫn đọc được */}
+                <p className="text-[16px] font-bold text-black mb-0">{form.eqtype}</p>
+                <p className="text-[14px] font-mono font-bold text-black border border-black px-2 mt-1 inline-block">
+                  {form.ctrlnum}
+                </p>
+              </div>
+            </div>
+          </Modal>     
         </div>
       </div>
     </div>

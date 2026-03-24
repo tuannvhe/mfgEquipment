@@ -24,6 +24,8 @@ const { Header, Sider, Content } = Layout
 const { Text, Title } = Typography
 dayjs.locale('vi');
 type ViewKey = 'list' | 'insp' | 'spare' | 'fail'
+import { Routes, Route, useNavigate, useLocation, BrowserRouter } from 'react-router-dom';
+import EquipmentView from './components/EquipmentView'; // Đảm bảo file này tồn tại
 
 const THEME_COLORS = {
   primary: '#4C9C2E',
@@ -44,7 +46,8 @@ function AppInner() {
   const [user, setUser] = useState<User | null>(() => authService.getCurrentUser())
   const [view, setView] = useState<ViewKey>('list')
   const [collapsed, setCollapsed] = useState(false)
-
+  const navigate = useNavigate();
+  const location = useLocation();
   // Tìm dòng 46 và sửa lại như sau:
 const { 
   equipment = [], 
@@ -174,33 +177,30 @@ const handleLogout = () => {
 
           {/* Navigation Menu */}
           <div style={{ flex: 1 }}>
-            <Menu
-              mode="inline"
-              theme="dark"
-              selectedKeys={[view]}
-              onClick={({ key }) => setView(key as ViewKey)}
-              style={{ background: 'transparent', border: 'none' }}
-              items={filteredNav.map(n => ({
-                key: n.key,
-                icon: (
-                  <Tooltip title={collapsed ? n.label : ''} placement="right">
-                    <span><n.Icon size={20} /></span>
-                  </Tooltip>
-                ),
-                label: (
-                  <span style={{ fontSize: 15, fontWeight: 600, marginLeft: 4 }}>
-                    {n.label}
-                    {n.key === 'list' && !collapsed && (
-                      <Badge
-                        //count={totalCount}
-                        size="small"
-                        style={{ marginLeft: 12, background: THEME_COLORS.primary, border: 'none', color: 'white' }}
-                      />
-                    )}
-                  </span>
-                ),
-              }))}
-            />
+          <Menu
+            mode="inline"
+            theme="dark"
+            // Thay selectedKeys={[view]} bằng location.pathname để Menu sáng đúng theo URL
+            selectedKeys={[location.pathname.split('/')[1] || 'list']} 
+            onClick={({ key }) => {
+              // setView(key as ViewKey); <-- XÓA DÒNG NÀY
+              navigate(`/${key}`); // THÊM DÒNG NÀY: Điều hướng URL thực tế
+            }}
+            style={{ background: 'transparent', border: 'none' }}
+            items={filteredNav.map(n => ({
+              key: n.key,
+              icon: (
+                <Tooltip title={collapsed ? n.label : ''} placement="right">
+                  <span><n.Icon size={20} /></span>
+                </Tooltip>
+              ),
+              label: (
+                <span style={{ fontSize: 15, fontWeight: 600, marginLeft: 4 }}>
+                  {n.label}
+                </span>
+              ),
+            }))}
+          />
           </div>
 
           {/* User Section at Bottom */}
@@ -339,20 +339,39 @@ const handleLogout = () => {
               pointerEvents: loading ? 'none' : 'auto' 
             }}
           >
-            {view === 'list' && (
-              <EquipmentListPage 
-                equipment={equipment} 
-                totalItems={totalCount}
-                stats={stats} 
-                currentPage={activePage}
-                pageSize={pageSize}
-                fetchEquipment={fetchEquipment}
-                onSave={handleSave} 
-                onDelete={handleDelete} 
-                user={user} 
-              />
-            )}
-            {view === 'fail' && <FailurePage equipment={equipment} user={user} />}
+            <Routes>
+              <Route path="/list" element={
+                <EquipmentListPage 
+                  equipment={equipment} 
+                  totalItems={totalCount}
+                  stats={stats} 
+                  currentPage={activePage}
+                  pageSize={pageSize}
+                  fetchEquipment={fetchEquipment}
+                  onSave={handleSave} 
+                  onDelete={handleDelete} 
+                  user={user} 
+                />
+              } />
+              
+              <Route path="/fail" element={<FailurePage equipment={equipment} user={user} />} />
+
+              {/* ĐƯỜNG DẪN QUAN TRỌNG ĐỂ QUÉT QR */}
+              <Route path="/equipment/view/:id" element={<EquipmentView />} />
+
+              {/* Mặc định nếu không khớp route nào thì về list */}
+              <Route path="/" element={<EquipmentListPage 
+                  equipment={equipment} 
+                  totalItems={totalCount}
+                  stats={stats} 
+                  currentPage={activePage}
+                  pageSize={pageSize}
+                  fetchEquipment={fetchEquipment}
+                  onSave={handleSave} 
+                  onDelete={handleDelete} 
+                  user={user} 
+                />} />
+            </Routes>
           </div>
         </Content>
       </Layout>
@@ -362,6 +381,7 @@ const handleLogout = () => {
 
 export default function App() {
   return (
+    <BrowserRouter>
     <ConfigProvider
     locale={viVN}
       theme={{
@@ -406,5 +426,6 @@ export default function App() {
         <AppInner />
       </AntApp>
     </ConfigProvider>
+    </BrowserRouter>
   )
 }

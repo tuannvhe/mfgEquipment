@@ -109,3 +109,13 @@
     -webkit-appearance: none !important;
   }
 }
+@media print {
+  /* Ẩn mọi thứ trừ vùng in QR khi lệnh handlePrintQR được gọi */
+  .qr-print-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+}

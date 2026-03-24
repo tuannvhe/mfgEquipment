@@ -20,42 +20,33 @@ export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, read
   const [localForm, setLocalForm] = useState<Equipment>({ ...eq })
 
 const isDirty = useMemo(() => {
-  // Nếu đang đóng hoặc là hàng mới hoàn toàn chưa gõ gì thì không tính dirty
   if (!open) return false;
 
   const checkDiff = (a: any, b: any) => {
     const fields = [
-      'appmodel',
-      'opcond',
-      'ctrlnum', 
-      'eqtype', 
-      'model', 
-      'serial',   
-      'location', 
-      'eqtitle', 
-      'mfgname', 
-      'mfgdate', 
-      'makeraddr', 
-      'value', 
-      'weight', 
-      'power', 
-      'size', 
-      'instdate',
-      'person',
-      'periodicItems',
-      'inspections',
-      'spareParts',
+      'appmodel', 'opcond', 'ctrlnum', 'eqtype', 'model', 'serial', 
+      'location', 'eqtitle', 'mfgname', 'mfgdate', 'value', 'weight', 
+      'power', 'size', 'instdate', 'person'
     ];
+    
     return fields.some(field => {
-      const valA = (a[field] ?? '').toString().trim();
-      const valB = (b[field] ?? '').toString().trim();
+      // 1. Chuẩn hóa giá trị về String và loại bỏ null/undefined
+      let valA = (a[field] ?? '').toString().trim();
+      let valB = (b[field] ?? '').toString().trim();
+
+      // 2. Xử lý lệch định dạng ngày (Chỉ lấy 10 ký tự đầu YYYY-MM-DD)
+      const dateFields = ['instdate', 'mfgdate'];
+      if (dateFields.includes(field)) {
+        valA = valA.substring(0, 10);
+        valB = valB.substring(0, 10);
+      }
+
       return valA !== valB;
     });
   };
 
   return checkDiff(localForm, eq);
-}, [localForm, eq, open]); // Bỏ isNew nếu muốn hàng mới cũng báo Dirty khi đã gõ
-
+}, [localForm, eq, open]);
 const toggleOpen = () => {
   if (open && isDirty) {
     Modal.confirm({
