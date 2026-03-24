@@ -8,7 +8,7 @@ import EquipmentForm from './EquipmentForm'
 interface Props {
   eq: Equipment
   isNew?: boolean
-  onSave: (eq: Equipment) => void
+  onSave: (eq: Equipment) => Promise<Equipment | void>;
   onDelete: (id: string) => void
   readOnly?: boolean
   defaultOpen?: boolean
@@ -25,28 +25,50 @@ const isDirty = useMemo(() => {
   const checkDiff = (a: any, b: any) => {
     const fields = [
       'appmodel', 'opcond', 'ctrlnum', 'eqtype', 'model', 'serial', 
-      'location', 'eqtitle', 'mfgname', 'mfgdate', 'value', 'weight', 
-      'power', 'size', 'instdate', 'person', 'periodicItems', 'spareParts', 'inspections'
+      'location', 'eqtitle', 'mfgname', 'value', 'weight', 
+      'power', 'size', 'person', 'photo1', 'photo2'
     ];
     
-    return fields.some(field => {
-      // 1. Chuẩn hóa giá trị về String và loại bỏ null/undefined
-      let valA = (a[field] ?? '').toString().trim();
-      let valB = (b[field] ?? '').toString().trim();
-
-      // 2. Xử lý lệch định dạng ngày (Chỉ lấy 10 ký tự đầu YYYY-MM-DD)
-      const dateFields = ['instdate', 'mfgdate'];
-      if (dateFields.includes(field)) {
-        valA = valA.substring(0, 10);
-        valB = valB.substring(0, 10);
-      }
-
+    // 1. So sánh các trường text/number
+    const isBasicDirty = fields.some(field => {
+      // Ép null/undefined về chuỗi rỗng để tránh lệch kiểu
+      const valA = (a[field] ?? '').toString().trim();
+      const valB = (b[field] ?? '').toString().trim();
       return valA !== valB;
     });
+    if (isBasicDirty) return true;
+
+    // 2. So sánh ngày (Chỉ lấy YYYY-MM-DD)
+    const dateFields = ['instdate', 'mfgdate'];
+    const isDateDirty = dateFields.some(field => {
+      const valA = (a[field] ?? '').toString().substring(0, 10);
+      const valB = (b[field] ?? '').toString().substring(0, 10);
+      // Nếu cả hai đều rỗng (substring của "" là "") thì coi như bằng nhau
+      return valA !== valB;
+    });
+    if (isDateDirty) return true;
+
+    // 3. So sánh mảng (Sub-records)
+    const arrayFields = ['periodicItems', 'spareParts', 'inspections'];
+    const isArrayDirty = arrayFields.some(field => {
+      const arrA = a[field] ?? [];
+      const arrB = b[field] ?? [];
+      
+      // Mẹo: Lọc bỏ các phần tử rỗng hoàn toàn trước khi so sánh 
+      // để tránh việc "bấm nhầm nút thêm dòng" làm dirty form
+      const cleanA = arrA.filter((item: any) => Object.values(item).some(v => v !== '' && v !== null));
+      const cleanB = arrB.filter((item: any) => Object.values(item).some(v => v !== '' && v !== null));
+
+      if (cleanA.length !== cleanB.length) return true;
+      return JSON.stringify(cleanA) !== JSON.stringify(cleanB);
+    });
+    
+    return isArrayDirty;
   };
 
   return checkDiff(localForm, eq);
 }, [localForm, eq, open]);
+
 const toggleOpen = () => {
   if (open && isDirty) {
     Modal.confirm({
@@ -89,15 +111,21 @@ useEffect(() => {
 
  const handleSave = async (data: Equipment) => {
   try {
-    await onSave(data);
+    // Giả sử onSave của bạn trả về data đã lưu từ Server (có ID, có format chuẩn)
+    const savedData = await onSave(data); 
     
-    setLocalForm({ ...data }); 
+    // Ép localForm cập nhật theo dữ liệu mới nhất
+    if (savedData) {
+      setLocalForm({ ...savedData });
+    } else {
+      setLocalForm({ ...data });
+    }
 
     if (isNew) {
-      //setOpen(false); //<-- Bỏ dòng này nếu bạn muốn form vẫn mở sau khi bấm lưu
-      // Hoặc reset form về trắng để nhập tiếp bản ghi khác
       setLocalForm(EMPTY_EQ());
     }
+    
+    //message.success("Đã lưu thay đổi");
   } catch (error) {
     console.error("Lưu thất bại:", error);
   }

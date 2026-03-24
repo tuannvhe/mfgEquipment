@@ -7,6 +7,7 @@ export interface PeriodicItem {
   item: string        // PeriodicItems
   inspdate: string    // DateOfInspection
   content: string     // InspectionDetails
+  
 }
 
 // Maps to SparePartDto (SpareParts) - gộp cả spare part + failure/repair history

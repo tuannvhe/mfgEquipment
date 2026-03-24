@@ -323,26 +323,38 @@ useLayoutEffect(() => {
 
       <style>{`
       /* Ngắt trang cho bảng */
-  table {
-    page-break-inside: auto;
-  }
-  
-  tr {
-    page-break-inside: avoid; /* Không cho phép ngắt ngang một hàng */
-    page-break-after: auto;
-  }
+      /* Thêm vào trong thẻ <style> hiện tại của bạn */
+        td {
+        word-break: break-all; /* Ép xuống dòng ngay cả khi là chuỗi liền nhau */
+        overflow-wrap: break-word;
+        vertical-align: middle; /* Giúp nội dung căn giữa đẹp hơn khi xuống dòng */
+        }
 
-  /* Giữ cho Header bảng lặp lại ở đầu mỗi trang mới (tùy trình duyệt) */
-  thead {
-    display: table-header-group;
-  }
+        /* Đảm bảo bảng không bao giờ vượt quá chiều rộng container */
+        table {
+        table-layout: fixed;
+        width: 100% !important;
+        }
+        table {
+            page-break-inside: auto;
+        }
+        
+        tr {
+            page-break-inside: avoid; /* Không cho phép ngắt ngang một hàng */
+            page-break-after: auto;
+        }
 
-  @media print {
-    .print-container {
-      height: auto !important; /* Khi in thì để chiều cao tự động theo nội dung */
-      min-height: 297mm;
-    }
-  }
+        /* Giữ cho Header bảng lặp lại ở đầu mỗi trang mới (tùy trình duyệt) */
+        thead {
+            display: table-header-group;
+        }
+
+        @media print {
+            .print-container {
+            height: auto !important; /* Khi in thì để chiều cao tự động theo nội dung */
+            min-height: 297mm;
+            }
+        }
       /* 1. NỀN TRẮNG TOÀN BỘ */
       .equipment-view-wrapper {
         background-color: #ffffff !important; /* Đổi về màu trắng */

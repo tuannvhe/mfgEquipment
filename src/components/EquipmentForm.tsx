@@ -881,6 +881,7 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
                 <p className="text-[14px] font-mono font-bold text-black border border-black px-2 mt-1 inline-block">
                   {form.ctrlnum}
                 </p>
+                
               </div>
             </div>
           </Modal>     
@@ -888,4 +889,5 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
       </div>
     </div>
   )
+  
 }

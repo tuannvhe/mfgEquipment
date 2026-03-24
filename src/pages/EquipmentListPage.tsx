@@ -89,8 +89,6 @@ export default function EquipmentListPage({
   { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
 ];
 
-
-  // Hàm trung tâm để gọi dữ liệu từ Server
  const updateData = (params: { 
   page?: number; 
   search?: string; 
@@ -199,7 +197,7 @@ const handleSearch = (overrideParams?: any) => {
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-slate-500 ml-1">
               <MapPin size={12} className="text-emerald-500" />
-              <span className="text-[11px] font-bold uppercase tracking-tight">Vị trí</span>
+              <span className="text-[11px] font-bold uppercase tracking-tight">Địa điểm lắp đặt</span>
             </div>
             <Select
               placeholder="Tất cả vị trí"
@@ -215,7 +213,7 @@ const handleSearch = (overrideParams?: any) => {
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-slate-500 ml-1">
               <Activity size={12} className="text-amber-500" />
-              <span className="text-[11px] font-bold uppercase tracking-tight">Trạng thái</span>
+              <span className="text-[11px] font-bold uppercase tracking-tight">Điều kiện vận hành</span>
             </div>
             <Select
               placeholder="Tất cả"
