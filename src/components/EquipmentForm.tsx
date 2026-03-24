@@ -100,7 +100,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
           appmodel: data.appliedModelName ?? data.appmodel ?? prev.appmodel,
           opcond: data.operatingConditions ?? data.opcond ?? prev.opcond,
           ctrlnum: data.controlNumber ?? data.ctrlnum ?? prev.ctrlnum,
-          eqtitle: data.equipmentTitle ?? data.eqtitle ?? prev.eqtitle,
+          eqtitle: data.manufacturerEquipmentTitle ?? data.eqtitle ?? prev.eqtitle,
           value: data.equipmentPrice != null ? String(data.equipmentPrice) : prev.value,
           location: data.installationLocation ?? data.location ?? prev.location,
           instdate: data.dateOfInstallation ? data.dateOfInstallation.split('T')[0] : prev.instdate,
@@ -112,7 +112,7 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
           mfgdate: data.dateOfManufacture ? data.dateOfManufacture.split('T')[0] : prev.mfgdate,
           weight: data.weight ?? prev.weight,
           size: data.size ?? prev.size,
-          eqtype: data.manufacturerEquipmentTitle ?? data.eqtype ?? prev.eqtype,
+          eqtype: data.equipmentTitle ?? data.eqtype ?? prev.eqtype,
           _serverImages: serverImages.length > 0 ? serverImages : (prev as any)._serverImages,
           photo1: (() => {
             const imgs = data.images || data.mainImages || [];

@@ -110,7 +110,7 @@ useLayoutEffect(() => {
             className="print-container bg-white mx-auto shadow-lg"
             style={{ 
                 width: '210mm', 
-                height: '297mm', // Thay minHeight bằng height để khớp A4
+                minHeight: '297mm', // Thay minHeight bằng height để khớp A4
                 padding: '10mm', 
                 color: 'black',
                 boxSizing: 'border-box' // Quan trọng: Để padding nằm TRONG 210mm
@@ -322,6 +322,27 @@ useLayoutEffect(() => {
       </div>
 
       <style>{`
+      /* Ngắt trang cho bảng */
+  table {
+    page-break-inside: auto;
+  }
+  
+  tr {
+    page-break-inside: avoid; /* Không cho phép ngắt ngang một hàng */
+    page-break-after: auto;
+  }
+
+  /* Giữ cho Header bảng lặp lại ở đầu mỗi trang mới (tùy trình duyệt) */
+  thead {
+    display: table-header-group;
+  }
+
+  @media print {
+    .print-container {
+      height: auto !important; /* Khi in thì để chiều cao tự động theo nội dung */
+      min-height: 297mm;
+    }
+  }
       /* 1. NỀN TRẮNG TOÀN BỘ */
       .equipment-view-wrapper {
         background-color: #ffffff !important; /* Đổi về màu trắng */

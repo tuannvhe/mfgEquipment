@@ -26,7 +26,7 @@ const isDirty = useMemo(() => {
     const fields = [
       'appmodel', 'opcond', 'ctrlnum', 'eqtype', 'model', 'serial', 
       'location', 'eqtitle', 'mfgname', 'mfgdate', 'value', 'weight', 
-      'power', 'size', 'instdate', 'person'
+      'power', 'size', 'instdate', 'person', 'periodicItems', 'spareParts', 'inspections'
     ];
     
     return fields.some(field => {
