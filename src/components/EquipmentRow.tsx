@@ -20,37 +20,57 @@ export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, read
   const [localForm, setLocalForm] = useState<Equipment>({ ...eq })
 
 const isDirty = useMemo(() => {
-  if (isNew || !open) return false;
+  // Nếu đang đóng hoặc là hàng mới hoàn toàn chưa gõ gì thì không tính dirty
+  if (!open) return false;
 
-  // Hàm so sánh đơn giản nhưng bỏ qua các khác biệt về null/undefined/empty array
   const checkDiff = (a: any, b: any) => {
-    const fields = ['ctrlnum', 'eqtype', 'model', 'serial', 'opcond', 'location', 'eqtitle', 'photo1', 'photo2'];
-    return fields.some(field => (a[field] || '') !== (b[field] || ''));
+    const fields = [
+      'appmodel',
+      'opcond',
+      'ctrlnum', 
+      'eqtype', 
+      'model', 
+      'serial',   
+      'location', 
+      'eqtitle', 
+      'mfgname', 
+      'mfgdate', 
+      'makeraddr', 
+      'value', 
+      'weight', 
+      'power', 
+      'size', 
+      'instdate',
+      'person',
+      'periodicItems',
+      'inspections',
+      'spareParts',
+    ];
+    return fields.some(field => {
+      const valA = (a[field] ?? '').toString().trim();
+      const valB = (b[field] ?? '').toString().trim();
+      return valA !== valB;
+    });
   };
 
   return checkDiff(localForm, eq);
-}, [localForm, eq, isNew, open]);
+}, [localForm, eq, open]); // Bỏ isNew nếu muốn hàng mới cũng báo Dirty khi đã gõ
 
- const toggleOpen = () => {
-  if (open) {
-    // Chỉ hiện Modal nếu thực sự có sự khác biệt giữa form đang sửa và bản gốc từ props
-    const hasChanged = JSON.stringify(localForm) !== JSON.stringify(eq);
-    
-    if (hasChanged) {
-      Modal.confirm({
-        title: 'Thay đổi chưa được lưu!',
-        content: 'Bạn có chắc chắn muốn đóng không? Các thay đổi sẽ bị mất.',
-        okText: 'Đóng và Bỏ qua',
-        cancelText: 'Tiếp tục sửa',
-        okType: 'danger',
-        centered: true,
-        onOk: () => {
-          setLocalForm({ ...eq }); // Reset về bản gốc của cha
-          setOpen(false);
-        },
-      });
-      return;
-    }
+const toggleOpen = () => {
+  if (open && isDirty) {
+    Modal.confirm({
+      title: 'Thay đổi chưa được lưu!',
+      content: 'Bạn có chắc chắn muốn đóng không? Các thay đổi sẽ bị mất.',
+      okText: 'Đóng và Bỏ qua',
+      cancelText: 'Tiếp tục sửa',
+      okType: 'danger',
+      centered: true,
+      onOk: () => {
+        setLocalForm({ ...eq }); 
+        setOpen(false);
+      },
+    });
+    return;
   }
   setOpen(!open);
 };
@@ -66,28 +86,31 @@ const isDirty = useMemo(() => {
     eq.opcond === 'Warning' ? 'bg-amber-500' : 'bg-red-500';
   // Sync when external eq changes (after save)
 useEffect(() => {
-  // Khi props eq thay đổi (do cha cập nhật sau khi lưu), 
-  // ta phải đồng bộ localForm để JSON.stringify khớp nhau trở lại
-  setLocalForm({ ...eq });
-}, [eq]);
+  // Chỉ cập nhật localForm từ props khi:
+  // 1. ID thay đổi (chuyển sang thiết bị khác)
+  // 2. Hoặc khi người dùng CHƯA gõ gì (không dirty) mà props eq có thay đổi từ server
+  const hasIdChanged = localForm.id !== eq.id;
+  
+  if (hasIdChanged || !isDirty) {
+    setLocalForm({ ...eq });
+  }
+}, [eq, isDirty]); // Thêm isDirty vào dependency
 
  const handleSave = async (data: Equipment) => {
   try {
     await onSave(data);
     
-    // BƯỚC QUAN TRỌNG: Cập nhật localForm bằng dữ liệu vừa lưu thành công
-    // để nó khớp hoàn toàn với dữ liệu mới từ props truyền xuống
     setLocalForm({ ...data }); 
 
     if (isNew) {
-      setOpen(false);
+      //setOpen(false); //<-- Bỏ dòng này nếu bạn muốn form vẫn mở sau khi bấm lưu
+      // Hoặc reset form về trắng để nhập tiếp bản ghi khác
       setLocalForm(EMPTY_EQ());
     }
   } catch (error) {
     console.error("Lưu thất bại:", error);
   }
 };
-
   const handleDelete = (id: string) => {
     onDelete(id)
     setOpen(false)

@@ -13,12 +13,15 @@ const parseJwt = (token: string): any | null => {
 }
 
 const normalizeUser = (raw: any): User => {
-  
   return {
-    id: raw?.id?.toString() || raw?.sub?.toString() || raw?.Id?.toString() || 'unknown',
-    username: raw?.username || raw?.sub || raw?.Username || 'unknown',
-    name: raw?.name || raw?.username || raw?.FullName || 'Người dùng',
-    role: raw?.role || raw?.Role || 'user',
+    id: raw?.id || raw?.sub || raw?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || 'unknown',
+    username: raw?.username || raw?.sub || raw?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || 'unknown',
+    name: raw?.name || raw?.FullName || 'Người dùng',
+    // Kiểm tra thêm các claim đặc thù của JWT
+    role: raw?.role || 
+          raw?.Role || 
+          raw?.['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || 
+          'user',
   };
 };
 
@@ -37,6 +40,7 @@ export const authService = {
     // Ưu tiên 1: Dữ liệu user object từ API trả về trực tiếp
     if (user) {
       finalUser = normalizeUser(user);
+      console.log('User object từ API:', finalUser);  
     } 
     // Ưu tiên 2: Giải mã từ JWT nếu API không trả về object user riêng
     else if (accessToken) {

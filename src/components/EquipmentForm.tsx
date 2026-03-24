@@ -191,8 +191,16 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   const [extraS, setExtraS] = useState(0)
   const [extraBot, setExtraBot] = useState(0)
 
-  const set = <K extends keyof Equipment>(key: K, val: Equipment[K]) =>
-    setForm(f => ({ ...f, [key]: val }))
+// Sửa hàm set trong EquipmentForm.tsx
+const set = <K extends keyof Equipment>(key: K, val: Equipment[K]) => {
+  const updatedForm = { ...form, [key]: val };
+  setForm(updatedForm);
+  
+  // Gửi dữ liệu mới về component Cha để tính toán isDirty
+  if (onChange) {
+    onChange(updatedForm);
+  }
+};
 
 const handleSave = async () => {
   const cleanForm = { ...form };

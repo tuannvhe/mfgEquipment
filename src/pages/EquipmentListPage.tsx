@@ -1,14 +1,13 @@
-import {  useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Equipment, User } from '../types'
 import EquipmentRow from '../components/EquipmentRow'
-import { Input, Select, Button, Pagination, DatePicker, Card, Divider, Skeleton, Space,  Tag} from 'antd' 
+import { Input, Select, Button, Pagination, DatePicker, Card, Skeleton} from 'antd' 
 import { 
   Search, X, Settings2, CheckCircle2, AlertCircle, XCircle, 
-  Download, PlusCircle, Calendar, Filter, MapPin, Activity, Type, List 
+  Download, Calendar, MapPin, Activity, Type, List 
 } from 'lucide-react'
 import dayjs from 'dayjs' 
 import type { TimeRangePickerProps} from 'antd';
-import { debounce } from 'lodash'
 
 const { RangePicker } = DatePicker;
 const LOCATIONS = ['Bắc Giang #1', 'Bắc Giang #2', 'Bắc Ninh', 'Hà Nam', 'Hưng Yên']
@@ -87,17 +86,7 @@ export default function EquipmentListPage({
   { label: 'Tháng trước', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
   { label: 'Năm nay', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
 ];
-const debouncedUpdateData = useCallback(
-    debounce((nextValue: string) => {
-      updateData({ page: 1, search: nextValue });
-    }, 500), // Đợi 500ms sau khi ngừng gõ mới gọi API
-    [fLoc, fStatus, fDates, fType, pageSize] // Các phụ thuộc để updateData chạy đúng
-  );
-  useEffect(() => {
-  return () => {
-    debouncedUpdateData.cancel();
-  };
-}, [debouncedUpdateData]);
+
   // Hàm trung tâm để gọi dữ liệu từ Server
  const updateData = (params: { 
   page?: number; 
@@ -249,7 +238,6 @@ const handleSearch = (overrideParams?: any) => {
               className="w-full h-9 rounded-lg bg-slate-50 border-slate-200"
               format="DD/MM/YYYY"
               presets={rangePresets}
-              // THÊM DÒNG NÀY ĐỂ VIỆT HÓA PLACEHOLDER
               placeholder={['Ngày bắt đầu', 'Ngày kết thúc']} 
               value={fDates ? [dayjs(fDates[0]), dayjs(fDates[1])] : null}
               onChange={(dates) => {
@@ -316,7 +304,10 @@ const handleSearch = (overrideParams?: any) => {
                 key="fixed-add-new-row" 
                 eq={EMPTY_EQ()} 
                 isNew={true}
-                onSave={onSave}
+                onSave={async (newEq) => {
+                  await onSave(newEq);
+                  // Sau khi lưu xong, form sẽ tự reset về EMPTY_EQ() nhờ key cố định
+                }}
                 onDelete={() => {}}
               />
             </div>
@@ -329,25 +320,23 @@ const handleSearch = (overrideParams?: any) => {
                 <EquipmentSkeleton key={i} />
               ))}
             </div>
-          ) : equipment.length === 0 ? (
-            <div className="text-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
-              <div className="bg-white inline-block p-4 rounded-full shadow-sm mb-4">
-                <Search size={40} className="text-slate-200" />
-              </div>
-              <p className="text-slate-500 font-medium italic">Không tìm thấy dữ liệu phù hợp</p>
-              <Button type="link" onClick={resetFilters}>Thử xóa bộ lọc</Button>
-            </div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
-              {equipment.map(eq => (
-                <EquipmentRow 
-                  key={eq.id} 
-                  eq={eq} 
-                  onSave={onSave} 
-                  onDelete={onDelete} 
-                  readOnly={readOnly} 
-                />
-              ))}
+              {equipment.length === 0 ? (
+                <div className="text-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
+                  {/* ... UI Empty ... */}
+                </div>
+              ) : (
+                equipment.map(eq => (
+                  <EquipmentRow 
+                    key={eq.id} 
+                    eq={eq} 
+                    onSave={onSave} 
+                    onDelete={onDelete} 
+                    readOnly={readOnly} 
+                  />
+                ))
+              )}
             </div>
           )}
         </div>
