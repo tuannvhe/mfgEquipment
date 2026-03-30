@@ -14,61 +14,110 @@ const parseJwt = (token: string): any | null => {
 
 const normalizeUser = (raw: any): User => {
   return {
-    id: raw?.id || raw?.sub || raw?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || 'unknown',
-    username: raw?.username || raw?.sub || raw?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || 'unknown',
-    name: raw?.name || raw?.FullName || 'Người dùng',
-    // Kiểm tra thêm các claim đặc thù của JWT
+    id: raw?.id || raw?.Id || raw?.sub || 'unknown',
+    
+    // Đọc trường Name từ URI của Microsoft
+    username: raw?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || 
+              raw?.unique_name || 
+              raw?.sub || 
+              'unknown',
+
+    name: raw?.name || 
+          raw?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || 
+          'Người dùng',
+
     role: raw?.role || 
-          raw?.Role || 
           raw?.['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || 
-          'user',
+          'user'
   };
 };
 
 export const authService = {
-  login: async (username: string, password: string): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/Auth/login', { username, password });
+  checkAuth: async (): Promise<User | null> => {
+    // 1. Dùng getAccessToken() để đảm bảo không lấy phải chuỗi "undefined"
+    const currentToken = authService.getAccessToken(); 
+    const refreshToken = localStorage.getItem('refresh_token');
 
-    const { accessToken, refreshToken, user } = response.data;
+    // Trường hợp 1: Còn Token và hợp lệ -> Trả về user
+    if (currentToken) {
+        return authService.getCurrentUser();
+    }
+
+    // Trường hợp 2: Mất Token nhưng còn RefreshToken -> Đi cấp mới
+    if (refreshToken && refreshToken !== 'undefined') {
+        try {
+            const response = await api.post('/Auth/refresh-token', { refreshToken });
+            
+            // QUAN TRỌNG: Lấy đúng trường "token" từ JSON bạn đã gửi
+            const newToken = response.data.token; 
+
+            if (newToken) {
+                localStorage.setItem('access_token', newToken);
+                
+                // Giải mã user từ token mới hoặc dùng user từ API nếu có
+                const userData = response.data.user || parseJwt(newToken);
+                const normalized = normalizeUser(userData);
+                
+                localStorage.setItem('user_info', JSON.stringify(normalized));
+                return normalized;
+            }
+        } catch (error) {
+            console.error("Refresh token failed", error);
+            authService.logout();
+            return null;
+        }
+    }
+
+    return null;
+},
+ login: async (username: string, password: string): Promise<AuthResponse> => {
+    const response = await api.post<any>('/Auth/login', { username, password });
+
+    // SỬA TẠI ĐÂY: Lấy 'token' thay vì 'accessToken'
+    const { token, refreshToken, user } = response.data; 
     
-    // Lưu token ngay
-    if (accessToken) localStorage.setItem('access_token', accessToken);
-    if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+    // Lưu vào localStorage (Dùng 'token' vừa lấy được)
+    if (token) {
+        localStorage.setItem('access_token', token);
+    }
+    if (refreshToken) {
+        localStorage.setItem('refresh_token', refreshToken);
+    }
 
     let finalUser: User | null = null;
 
-    // Ưu tiên 1: Dữ liệu user object từ API trả về trực tiếp
     if (user) {
-      finalUser = normalizeUser(user);
-      console.log('User object từ API:', finalUser);  
-    } 
-    // Ưu tiên 2: Giải mã từ JWT nếu API không trả về object user riêng
-    else if (accessToken) {
-      const parsed = parseJwt(accessToken);
-      if (parsed) finalUser = normalizeUser(parsed);
+        finalUser = normalizeUser(user);
+    } else if (token) {
+        // Giải mã từ biến 'token'
+        const parsed = parseJwt(token);
+        if (parsed) finalUser = normalizeUser(parsed);
     }
+
+    // Xử lý fallback cho role và thông tin user khác
     const apiData = response.data as any;
-  
-  // Kiểm tra mọi khả năng: role (viết thường) hoặc Role (viết hoa) từ Database
-  const fallbackRole = apiData.role || apiData.Role || apiData.user?.role || 'user';
-    // Ưu tiên 3: Fallback cuối cùng nếu cả 2 cách trên đều thất bại
+    const fallbackRole = apiData.role || apiData.Role || finalUser?.role || 'user';
+
     if (!finalUser) {
-      finalUser = {
-        id: 'unknown',
-        username,
-        name: username,
-        role: fallbackRole, // Gán giá trị chuỗi cụ thể thay vì biến role không tồn tại
-      };
+        finalUser = {
+            id: 'unknown',
+            username,
+            name: username,
+            role: fallbackRole,
+        };
+    } else {
+        // Cập nhật role nếu finalUser đã tồn tại
+        finalUser.role = fallbackRole;
     }
 
     localStorage.setItem('user_info', JSON.stringify(finalUser));
 
     return {
-      accessToken,
-      refreshToken,
-      user: finalUser,
+        accessToken: token, // Trả về token cho interface AuthResponse
+        refreshToken,
+        user: finalUser,
     };
-  },
+},
 
   logout: () => {
     localStorage.removeItem('access_token')
@@ -86,6 +135,15 @@ export const authService = {
     }
   },
 
-  getAccessToken: () => localStorage.getItem('access_token'),
+  getAccessToken: () => {
+    const token = localStorage.getItem('access_token');
+    // Loại bỏ các trường hợp giá trị rác
+    if (!token || token === 'undefined' || token === 'null') {
+        return null;
+    }
+    return token;
+},
   getRefreshToken: () => localStorage.getItem('refresh_token')
+  
+  
 }

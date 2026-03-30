@@ -25,7 +25,24 @@ export default function EquipmentRow({ eq, isNew = false, onSave, onDelete, read
     if (isSaving || !open) return false;
     if (isNew && !localForm.ctrlnum && !localForm.eqtype) return false;
 
-    const fields = ['appmodel', 'opcond', 'ctrlnum', 'eqtype', 'model', 'serial', 'location', 'eqtitle', 'mfgname'] as const;
+    const fields = [
+      'appmodel', 
+      'opcond', 
+      'ctrlnum', 
+      'eqtype', 
+      'model', 
+      'serial', 
+      'location', 
+      'eqtitle', 
+      'mfgname',
+      'mfgdate',
+      'weight',
+      'power',
+      'size',
+      'makeraddr',
+      'instdate',
+      'person',
+      'value'] as const;
     return fields.some(f => (localForm[f] ?? '').toString().trim() !== (eq[f] ?? '').toString().trim());
   }, [localForm, eq, isSaving, open]);
 

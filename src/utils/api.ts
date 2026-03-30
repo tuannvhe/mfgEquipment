@@ -1,12 +1,13 @@
 import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://localhost:7018/api'
+const API_URL ='http://localhost:6004/api'
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: `${API_URL}`,
   headers: {
-    'Accept': 'application/json'
+    'Content-Type': 'application/json'
   },
+   withCredentials:true
 })
 
 // Request interceptor: attach token to headers

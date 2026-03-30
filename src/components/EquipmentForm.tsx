@@ -15,6 +15,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Modal } from 'antd'; // Đã có Button, Space... ở trên
 import { QrCode, Download } from 'lucide-react';
 
+
+
 interface Props {
   initialData: Equipment
   isNew: boolean
@@ -222,11 +224,15 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   const [extraS, setExtraS] = useState(0)
   const [extraBot, setExtraBot] = useState(0)
 
+// Sửa hàm set trong EquipmentForm.tsx
 const set = <K extends keyof Equipment>(key: K, val: Equipment[K]) => {
-  if (isSaving) return; // Không gửi update khi đang lưu
   const updatedForm = { ...form, [key]: val };
   setForm(updatedForm);
-  if (onChange) onChange(updatedForm);
+  
+  // Gửi dữ liệu mới về component Cha để tính toán isDirty
+  if (onChange) {
+    onChange(updatedForm);
+  }
 };
 const handlePrintQR = useReactToPrint({
   contentRef: qrPrintRef, // Phải khớp với ref ở div bên dưới

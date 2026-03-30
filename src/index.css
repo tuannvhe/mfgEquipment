@@ -119,3 +119,21 @@
     height: 100vh;
   }
 }
+/* Tùy chỉnh panel của DatePicker */
+.ant-picker-dropdown .ant-picker-presets > ul > li {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  transition: all 0.2s;
+}
+
+.ant-picker-dropdown .ant-picker-presets > ul > li:hover {
+  color: #10b981 !important; /* Màu Emerald đồng bộ với UI */
+  background: #f0fdf4;
+}
+
+.ant-picker-range-wrapper {
+  border-radius: 1.5rem !important;
+  overflow: hidden;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}

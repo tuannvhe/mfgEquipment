@@ -78,3 +78,32 @@ export interface AuthResponse {
   user: User
   role?: string
 }
+
+export interface AuditLog {
+  id: number;
+  equipmentId?: number; // Trường đã có
+  equipmentTitle?: string;  // THÊM DÒNG NÀY
+  controlNumber?: string;   // THÊM DÒNG NÀY
+  entityName: string;
+  propertyName: string;
+  oldValue: string | null;
+  newValue: string | null;
+  action: string;
+  updatedBy: string;
+  updatedAt: string;
+  installationLocation?: string;
+}
+// src/types/index.ts
+export interface PagedResult<T> {
+  items: T[];
+  totalCount: number; // Đổi từ totalItems thành totalCount (chữ t viết thường)
+  pageSize: number;
+  currentPage: number;
+  totalPages: number;
+  auditStats: AuditStats | null;
+}
+export interface AuditStats {
+  total: number;
+  new24h: number;
+  deleted: number;
+}
