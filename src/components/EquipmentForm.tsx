@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
-  Button, Space, Tooltip, DatePicker, Image, notification
+  Button, Space, Tooltip, DatePicker, Image, notification,
+  Select,
+  Spin
 } from 'antd'
 import { Save, Trash2, Plus, X, Upload, Eraser, Printer, SearchIcon } from 'lucide-react'
 import type { Equipment } from '../types'
@@ -14,8 +16,7 @@ const LOCATIONS = ['Bắc Giang #1', 'Bắc Giang #2', 'Bắc Ninh', 'Hà Nam', 
 import { QRCodeSVG } from 'qrcode.react';
 import { Modal } from 'antd'; // Đã có Button, Space... ở trên
 import { QrCode, Download } from 'lucide-react';
-
-
+import SparePartModal from '../components/SparePartModal';
 
 interface Props {
   initialData: Equipment
@@ -25,6 +26,7 @@ interface Props {
   onCancel: () => void
   readOnly?: boolean
   onChange?: (newData: Equipment) => void;
+  isDirty: boolean;
 }
 
 const TdLabel = ({ children, colSpan = 1, className = '' }: any) => (
@@ -83,6 +85,15 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
   const [isSaving, setIsSaving] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const qrPrintRef = useRef<HTMLDivElement>(null);
+  const MOCK_PARTS = [
+  { label: 'Sensor E3Z-D61 (Omron)', value: 'Sensor E3Z-D61' },
+  { label: 'Relay MY4N-GS (Omron)', value: 'Relay MY4N-GS' },
+  { label: 'Belt 100mm (Standard)', value: 'Belt 100mm' },
+  { label: 'Motor 750W (Panasonic)', value: 'Motor 750W' },
+  { label: 'Cylinder SMC 20-50', value: 'Cylinder SMC 20-50' },
+  { label: 'Power Supply 24V-10A', value: 'Power Supply 24V' },
+  { label: '--- Không thay thế ---', value: '' },
+];
   useEffect(() => {
     if (isNew || !initialData.id) return
 
@@ -226,50 +237,66 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
 
 // Sửa hàm set trong EquipmentForm.tsx
 const set = <K extends keyof Equipment>(key: K, val: Equipment[K]) => {
-  const updatedForm = { ...form, [key]: val };
-  setForm(updatedForm);
-  
-  // Gửi dữ liệu mới về component Cha để tính toán isDirty
-  if (onChange) {
-    onChange(updatedForm);
-  }
+  setForm(prev => {
+    const updatedForm = { ...prev, [key]: val };
+    
+    // Gọi onChange với dữ liệu mới nhất
+    if (onChange) {
+      onChange(updatedForm);
+    }
+    
+    return updatedForm;
+  });
 };
+
 const handlePrintQR = useReactToPrint({
   contentRef: qrPrintRef, // Phải khớp với ref ở div bên dưới
   documentTitle: `QR_Code_${form.ctrlnum || form.id}`,
   // Có thể thêm print: true để nó tự mở dialog in ngay
 });
 const handleSave = async () => {
-  const cleanForm = { ...form };
   setIsSaving(true);
   
-  // 1. Dọn dẹp dữ liệu trước khi gửi
-  cleanForm.periodicItems = (cleanForm.periodicItems || []).filter(i => 
-    i.interval || i.item || i.inspdate || i.content
-  );
-  cleanForm.spareParts = (cleanForm.spareParts || []).filter(i => 
-    i.name || i.partnum || i.qty || i.spec || i.failure || i.replacement || i.inspector || i.remarks
+  // 1. Tạo bản sao để xử lý
+  const cleanForm = { ...form };
+
+  // 2. Dọn dẹp SpareParts
+  cleanForm.spareParts = (cleanForm.spareParts || [])
+  .map(item => ({
+    // Giữ nguyên các trường cũ (id, name, partnum, qty...)
+    
+    ...item,
+    
+    // Mapping sang tên trường mà Backend DTO yêu cầu (PascalCase/Specific names)
+    // Backend: PartName, PartNumber, ReplacementParts...
+    partName: item.name,        // Map 'name' ở FE sang 'partName' cho BE
+    partNumber: item.partnum,   // Map 'partnum' ở FE sang 'partNumber' cho BE
+    quantity: item.qty,         // Map 'qty' ở FE sang 'quantity' cho BE
+    replacementParts: item.replacementParts || item.replacement,
+    sparePartCode: item.sparePartCode,
+    selectedQty: item.selectedQty,
+    stockName: item.stockName,
+    workCenterCode: item.workCenterCode
+    
+  }))
+  .filter(i => 
+    // Kiểm tra các trường hiện có trong interface của bạn (name, partnum, replacement...)
+    i.name || i.partnum || i.replacementParts || i.sparePartCode
   );
 
   try {
-    // 2. onSave nên trả về data đã lưu từ Server
-    const savedData = await onSave(cleanForm); 
+    console.log("=== DỮ LIỆU THỰC TẾ GỬI ĐI (PAYLOAD) ===");
+    console.log(cleanForm); // Log cleanForm, đừng log 'form' vì 'form' là state cũ
 
+    const savedData = await onSave(cleanForm); 
+    
     if (savedData) {
-      // 3. Cập nhật lại form bằng dữ liệu chuẩn từ Server
-      // Việc này giúp localForm khớp 100% với props 'eq' ở component cha
       setForm({ ...savedData });
-      
-      if (onChange) {
-        onChange(savedData);
-      }
-      
+      if (onChange) onChange(savedData);
       notification.success({ message: 'Lưu thành công' });
     }
 
-    if (isNew) {
-      onCancel(); 
-    }
+    if (isNew) onCancel(); 
   } catch (error) {
     console.error("Lỗi:", error);
   } finally {
@@ -436,6 +463,65 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
     if (extraBot > 0) setExtraBot(b => b - 1)
   }
 
+const [editingField, setEditingField] = useState<'name' | 'replacement' | null>(null);
+const [isModalOpen, setIsModalOpen] = useState(false);
+const [editingIndex, setEditingIndex] = useState<number | null>(null);
+const selectedWC = initialData?.workCenterCode || "";
+
+const handleClearField = (index: number, field: 'name' | 'replacement') => {
+  const newSpareParts = [...(form.spareParts || [])];
+  
+  if (!newSpareParts[index]) return;
+
+  const updatedItem = {
+    ...newSpareParts[index],
+    [field]: "",
+  };
+
+  // ĐẢO NGƯỢC: Nếu xóa 'name', thì mới xóa kèm các thông tin kỹ thuật
+  if (field === 'name') {
+    updatedItem.partnum = "";
+    updatedItem.spec = "";
+  }
+
+  newSpareParts[index] = updatedItem;
+  set('spareParts', newSpareParts);
+};
+const handlePartSelect = (
+  part: any, 
+  quantity: number, 
+  storage: string, 
+  sparePartCode: string, 
+  workCenterCode: string 
+) => {
+  if (part && editingIndex !== null) {
+    const newSpareParts = [...(form.spareParts || [])];
+    const currentRow = { ...newSpareParts[editingIndex] };
+
+    // Phải khớp với thuộc tính trong SparePartDto (C#)
+    if (editingField === 'replacement') {
+      // 1. Backend dùng 'ReplacementParts' có chữ 's'
+      currentRow.replacement = part.sparePartName;
+      
+      // 2. Các trường kho bãi (Viết đúng camelCase hoặc PascalCase tùy config backend)
+      // Thông thường JSON gửi đi nên là camelCase: sparePartCode, selectedQty...
+      currentRow.sparePartCode = sparePartCode; 
+      currentRow.selectedQty = quantity;
+      currentRow.stockName = storage;
+      currentRow.workCenterCode = workCenterCode;
+
+      // Lưu ý: Nếu bạn đang dùng Ant Design Tooltip hoặc Table hiển thị 
+      // thì phải sửa cả dataIndex/key ở chỗ render đó thành 'replacementParts'
+    }
+
+    newSpareParts[editingIndex] = currentRow;
+    set('spareParts', newSpareParts);
+  }
+  
+  setIsModalOpen(false);
+  setEditingIndex(null);
+  setEditingField(null);
+};
   return (
     <div className="border-t border-slate-100 eq-row-expand bg-[#fdfdfd]">
       {/* Action bar */}
@@ -761,8 +847,34 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
                             const s = getSPart(i);
                             return (
                               <tr key={`s_${i}`} className="group">
-                                <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelInput value={s.name} onChange={(v: string) => setSPart(i, 'name', v)} className={inputClass} />
+                                <td 
+                                  className="border-b border-r border-black bg-white p-0 align-middle cursor-pointer hover:bg-blue-50 group relative"
+                                  onClick={() => {
+                                    setEditingIndex(i);
+                                    setEditingField('name'); // Hoặc 'replacement' tùy ô
+                                    setIsModalOpen(true);
+                                  }}
+                                >
+                                  <div className="flex justify-between items-center px-2 min-h-[32px] text-[12px]">
+                                    <span className="truncate flex-1 py-1">
+                                      {s.name || <span className="text-gray-400 italic">Chọn...</span>}
+                                    </span>
+
+                                    {/* Nút xóa hiện lên khi hover vào ô */}
+                                    {s.name && (
+                                      <button
+                                        className="hidden group-hover:block ml-1 text-gray-400 hover:text-red-500 font-bold px-1"
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // Ngăn việc mở Modal khi bấm xóa
+                                          handleClearField(i, 'name'); 
+                                        }}
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                    
+                                    <span className="text-gray-400 text-[10px] ml-1 shrink-0">▼</span>
+                                  </div>
                                 </td>
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
                                   <ExcelInput value={s.partnum} onChange={(v: string) => setSPart(i, 'partnum', v)} className={`font-mono text-blue-800 ${inputClass}`} />
@@ -798,8 +910,37 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
                                 <td className="border-b border-r border-black bg-white p-0  align-middle">
                                   <ExcelInput value={r.failure} onChange={(v: string) => setInsp(i, 'failure', v)} className={inputClass} />
                                 </td>
-                                <td className="border-b border-r border-black bg-white p-0 align-middle">
-                                  <ExcelInput value={r.replacement} onChange={(v: string) => setInsp(i, 'replacement', v)} className={inputClass} />
+                                <td 
+                                  className="border-b border-r border-black bg-white p-0 align-middle cursor-pointer hover:bg-blue-50 group relative"
+                                  onClick={() => {
+                                    setEditingIndex(i);
+                                    setEditingField('replacement');
+                                    setIsModalOpen(true);
+                                  }}
+                                >
+                                  <div className="flex justify-between items-center px-2 min-h-[32px] text-[12px]">
+                                    {/* Tooltip chỉ bao bọc phần text để hiện nội dung đầy đủ */}
+                                    <Tooltip title={r.replacement} mouseEnterDelay={0.5}>
+                                      <span className="truncate flex-1 py-1">
+                                        {r.replacement  || <span className="text-gray-400 italic">Chọn...</span>}
+                                      </span>
+                                    </Tooltip>
+
+                                    {/* Nút xóa */}
+                                    {r.replacement && (
+                                      <button
+                                        className="hidden group-hover:block ml-1 text-gray-400 hover:text-red-500 font-bold px-1"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleClearField(i, 'replacement'); 
+                                        }}
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                    
+                                    <span className="text-gray-400 text-[10px] ml-1 shrink-0">▼</span>
+                                  </div>
                                 </td>
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
                                   <ExcelInput value={r.inspector} onChange={(v: string) => setInsp(i, 'inspector', v)} className={inputClass} />
@@ -886,10 +1027,18 @@ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'photo
                 
               </div>
             </div>
-          </Modal>     
+          </Modal>  
+          <SparePartModal 
+            visible={isModalOpen}
+            initialWC={selectedWC} 
+            onCancel={() => setIsModalOpen(false)}
+            onSelect={handlePartSelect}
+          />   
         </div>
       </div>
     </div>
+    
   )
   
 }
+

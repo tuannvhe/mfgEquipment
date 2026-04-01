@@ -18,6 +18,10 @@ interface ReplacementState {
   resetFilters: () => void;
   selectedPart: string | undefined; // Thêm biến lưu linh kiện đang chọn
   setSelectedPart: (partId: string | undefined) => void;
+  selectedPartId: string | undefined; // Lưu ID
+  setSelectedPartId: (partId: string | undefined) => void;
+  operatingConditions: 'all' | 'good' | 'warning' | 'bad';
+  setOperatingConditions: (conditions: 'all' | 'good' | 'warning' | 'bad') => void;
 }
 
 export const useReplacementStore = create<ReplacementState>((set, get) => ({
@@ -29,7 +33,13 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
   dateRange: null,
   searchText: '',
   selectedPart: undefined,
-
+    selectedPartId: undefined,
+    operatingConditions: 'all',
+    setOperatingConditions: (conditions) => set({ operatingConditions: conditions }),
+  setSelectedPartId: (partId) => {
+    // Reset về trang 1 khi chọn linh kiện mới
+    set({ selectedPartId: partId, pagination: { ...get().pagination, current: 1 } });
+  },
   // Chỉ cập nhật State, không gọi fetchLogs()
   setSelectedPart: (partId) => {
     set({ selectedPart: partId, pagination: { ...get().pagination, current: 1 } });
@@ -37,9 +47,14 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
 
   // Khi đổi trang hoặc số bản ghi trên trang thì thường sẽ fetch luôn để người dùng thấy kết quả
   setPagination: (current, pageSize) => {
-    set({ pagination: { current, pageSize } });
-    get().fetchLogs();
-  },
+  set((state) => ({
+    pagination: { 
+      current: current ?? state.pagination.current, 
+      pageSize: pageSize ?? state.pagination.pageSize 
+    }
+  }));
+  get().fetchLogs(); // Khi đổi trang thì fetch luôn là đúng
+},
 
   // Chỉ cập nhật State, không gọi fetchLogs()
   setDateRange: (range) => {
@@ -49,42 +64,50 @@ export const useReplacementStore = create<ReplacementState>((set, get) => ({
   setSearchText: (text) => set({ searchText: text }),
 
   resetFilters: () => {
-    set({ 
-      dateRange: null, 
-      searchText: '', 
-      pagination: { current: 1, pageSize: 10 }, 
-      selectedPart: undefined 
-    });
-    get().fetchLogs(); // Reset thì nên fetch lại dữ liệu mặc định
-  },
+  set({ 
+    dateRange: null, 
+    searchText: '', 
+    selectedPartId: undefined, // PHẢI thêm dòng này để reset Combo Box
+    selectedPart: undefined,
+    operatingConditions: 'all',
+    pagination: { current: 1, pageSize: 10 }, 
+  });
+  get().fetchLogs(); // Reset xong fetch lại dữ liệu mặc định là đúng logic
+},
 
-  fetchLogs: async () => {
-    const { pagination, dateRange, searchText, selectedPart } = get();
-    set({ loading: true });
+fetchLogs: async () => {
+  const { pagination, dateRange, searchText, selectedPartId, operatingConditions } = get();
+  
+  // Bật loading để App.tsx hiển thị Overlay
+  set({ loading: true });
+  
+  try {
+    const response = await api.get('/Replacement', { 
+      params: {
+        pageIndex: pagination.current,
+        pageSize: pagination.pageSize,
+        // Dùng startOf/endOf để đảm bảo lấy hết dữ liệu trong ngày
+        fromDate: dateRange?.[0] ? dayjs(dateRange[0]).startOf('day').toISOString() : undefined,
+        toDate: dateRange?.[1] ? dayjs(dateRange[1]).endOf('day').toISOString() : undefined,
+        searchTerm: searchText || undefined,
+        partId: selectedPartId || undefined, 
+        operatingConditions: operatingConditions === 'all' ? undefined : operatingConditions,
+        _t: Date.now(), // Chống cache trình duyệt
+      }
+    });
     
-    try {
-      const response = await api.get('/Replacement', { 
-        params: {
-          pageIndex: pagination.current,
-          pageSize: pagination.pageSize,
-          fromDate: dateRange?.[0] ? dayjs(dateRange[0]).format('YYYY-MM-DD') : undefined,
-          toDate: dateRange?.[1] ? dayjs(dateRange[1]).format('YYYY-MM-DD') : undefined,
-          query: searchText || undefined,
-          partName: selectedPart || undefined, // ĐỪNG QUÊN THÊM BIẾN NÀY VÀO PARAMS
-          _t: Date.now() 
-        }
-      });
-      
-      const result = response.data;
-      set({ 
-        items: result.items || [], 
-        totalCount: result.totalCount || 0, 
-        stats: result.stats || null, 
-        loading: false 
-      });
-    } catch (error) {
-      console.error("Replacement fetch error:", error);
-      set({ loading: false, items: [] });
-    }
+    const result = response.data;
+    set({ 
+      items: result.items || [],
+      totalCount: result.totalCount || 0,
+      stats: result.replacementStats,
+    });
+  } catch (error) {
+    console.error("Fetch replacement logs error:", error);
+    set({ items: [], totalCount: 0 });
+  } finally {
+    // Luôn luôn tắt loading dù thành công hay thất bại
+    set({ loading: false });
   }
+}
 }));

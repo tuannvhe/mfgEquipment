@@ -77,6 +77,7 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
     makeraddr: data.manufacturerAddr ?? data.makeraddr ?? '',
     photo1: '',
     photo2: '',
+    workCenterCode: data.workCenterCode || '',
     // periodicInspections -> periodicItems, lọc bỏ row toàn null
     periodicItems: (data.periodicInspections || data.periodicItems || [])
       .filter((item: any) => item.inspectionInterval || item.periodicItems || item.dateOfInspection || item.inspectionDetails || item.interval || item.content)
@@ -109,19 +110,29 @@ function mapApiToEquipment(data: any, existingMeta: any[] = []): Equipment {
       return result;
     })(),
     // spareParts: giữ row nếu có bất kỳ field nào có giá trị
-    spareParts: (data.spareParts || [])
-      .filter((item: any) => item.partName || item.partNumber || item.specification || item.quantity || item.failureHistory || item.replacementParts || item.inspector || item.remarks)
-      .map((item: any) => ({
-        id: String(item.id || uid()),
-        name: item.partName || item.name || '',
-        partnum: item.partNumber || item.partnum || '',
-        spec: item.specification || item.spec || '',
-        qty: String(item.quantity ?? item.qty ?? ''),
-        replacement: item.replacementParts || item.replacement || '',
-        failure: item.failureHistory || item.failure || '',
-        inspector: item.inspector || '',
-        remarks: item.remarks || '',
-      })),
+spareParts: (data.spareParts || [])
+  .filter((item: any) => 
+    item.partName || item.partNumber || item.specification || 
+    item.quantity || item.failureHistory || item.replacementParts || 
+    item.sparePartCode // Thêm điều kiện lọc để không mất dòng có linh kiện kho
+  )
+  .map((item: any) => ({
+    id: String(item.id || uid()),
+    name: item.partName || item.name || '',
+    partnum: item.partNumber || item.partnum || '',
+    spec: item.specification || item.spec || '',
+    qty: String(item.quantity ?? item.qty ?? ''),
+    replacement: item.replacementParts || item.replacement || '',
+    failure: item.failureHistory || item.failure || '',
+    inspector: item.inspector || '',
+    remarks: item.remarks || '',
+    
+    // QUAN TRỌNG: Phải map các trường này để khi nhấn Save nó có dữ liệu gửi đi
+    sparePartCode: item.sparePartCode || '',
+    selectedQty: item.selectedQty || 0,
+    stockName: item.stockName || '',
+    workCenterCode: item.workCenterCode || '',
+  })),
   };
 
  const serverMeta: any[] = [];
@@ -228,19 +239,25 @@ processPhoto(eq.photo2, true);
     formData.append(`PeriodicInspections[${idx}][inspectionDetails]`, item.content || '');
   });
 
-  // SpareParts - indexed form fields (ASP.NET [FromForm] binding)
   (eq.spareParts || []).forEach((item, idx) => {
-    const sid = toValidIntId(item.id);
-    formData.append(`SpareParts[${idx}][id]`, sid);
-    formData.append(`SpareParts[${idx}][partName]`, item.name || '');
-    formData.append(`SpareParts[${idx}][partNumber]`, item.partnum || '');
-    formData.append(`SpareParts[${idx}][specification]`, item.spec || '');
-    formData.append(`SpareParts[${idx}][quantity]`, String(Number(item.qty) || 0));
-    formData.append(`SpareParts[${idx}][replacementParts]`, item.replacement || '');
-    formData.append(`SpareParts[${idx}][failureHistory]`, item.failure || '');
-    formData.append(`SpareParts[${idx}][inspector]`, item.inspector || '');
-    formData.append(`SpareParts[${idx}][remarks]`, item.remarks || '');
-  });
+  const sid = toValidIntId(item.id);
+  formData.append(`SpareParts[${idx}][id]`, sid);
+  formData.append(`SpareParts[${idx}][partName]`, item.name || '');
+  formData.append(`SpareParts[${idx}][partNumber]`, item.partnum || '');
+  formData.append(`SpareParts[${idx}][specification]`, item.spec || '');
+  formData.append(`SpareParts[${idx}][quantity]`, String(Number(item.qty) || 0));
+  formData.append(`SpareParts[${idx}][replacementParts]`, item.replacement || '');
+  formData.append(`SpareParts[${idx}][failureHistory]`, item.failure || '');
+  formData.append(`SpareParts[${idx}][inspector]`, item.inspector || '');
+  formData.append(`SpareParts[${idx}][remarks]`, item.remarks || '');
+
+  // --- BỔ SUNG CÁC TRƯỜNG KHO TẠI ĐÂY ---
+  // Lưu ý: Key phải khớp chính xác với tên thuộc tính trong SparePartDto của Backend
+  formData.append(`SpareParts[${idx}][sparePartCode]`, item.sparePartCode || '');
+  formData.append(`SpareParts[${idx}][selectedQty]`, String(Number(item.selectedQty) || 0));
+  formData.append(`SpareParts[${idx}][stockName]`, item.stockName || '');
+  formData.append(`SpareParts[${idx}][workCenterCode]`, item.workCenterCode || '');
+});
 
   return formData;
 }

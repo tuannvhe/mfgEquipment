@@ -31,6 +31,7 @@ import AuditLogPage from './pages/AuditLogPage'
 import { Clock3 } from 'lucide-react'
 import { useAuditStore } from './store/useAuditStore';
 import ReplacementPage from './pages/ReplacementManagementPage' // <-- THÊM DÒNG NÀY
+import { useReplacementStore } from './store/useReplacementStore'
 
 const THEME_COLORS = {
   primary: '#4C9C2E',
@@ -44,7 +45,7 @@ const THEME_COLORS = {
 
 const NAV: { key: string; label: string; sub: string; Icon: any; roles?: string[] }[] = [
   { key: 'list',  label: 'Danh sách thiết bị',   sub: 'Equipment List', Icon: Settings2},
-  { key: 'replacement', label: 'Linh kiện thay thế', sub: 'Replacement Parts', Icon: RefreshCw }, // <-- THÊM DÒNG NÀY
+  { key: 'replacement', label: 'Linh kiện thay thế', sub: 'Replacement Parts', Icon: Wrench }, // <-- THÊM DÒNG NÀY
   { key: 'logs',  label: 'Nhật ký hệ thống',    sub: 'System Logs',     Icon: Clock3 },
 ]
 
@@ -55,6 +56,7 @@ function AppInner() {
   const [collapsed, setCollapsed] = useState(false)
   const navigate = useNavigate();
   const location = useLocation();
+  const { loading: replacementLoading } = useReplacementStore();
   // Tìm dòng 46 và sửa lại như sau:
 // --- CHỈ GỌI MỘT LẦN DUY NHẤT ---
 const { 
@@ -323,33 +325,33 @@ const currentPage = NAV.find(n => n.key === currentPathKey);
         <Content style={{ padding: '15px 20px', overflowY: 'auto', position: 'relative', height: '100%' }}>
   
          {/* Sửa dòng này từ {loading && ( thành {isGlobalLoading && ( */}
-{isGlobalLoading && (
-  <div style={{
-    position: 'fixed',
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    bottom: 0,
-    background: 'rgba(243, 244, 246, 0.4)',
-    zIndex: 9999,
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backdropFilter: 'blur(4px)',
-  }}>
-    <div className="animate-in zoom-in duration-300">
-      <div className="p-8 bg-white/90 rounded-[2rem] shadow-2xl border border-white flex flex-col items-center min-w-[200px]">
-        <Spin size="large" />
-        <Text strong style={{ marginTop: 20, color: THEME_COLORS.primary, letterSpacing: '1px', fontSize: '17px' }}>
-          ĐANG ĐỒNG BỘ HỆ THỐNG
-        </Text>
-        <Text style={{ fontSize: '13px', color: '#94a3b8', marginTop: 4 }}>
-          Vui lòng đợi trong giây lát
-        </Text>
-      </div>
-    </div>
-  </div>
-)}
+          {isGlobalLoading && (
+            <div style={{
+              position: 'fixed',
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0,
+              background: 'rgba(243, 244, 246, 0.4)',
+              zIndex: 9999,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backdropFilter: 'blur(4px)',
+            }}>
+              <div className="animate-in zoom-in duration-300">
+                <div className="p-8 bg-white/90 rounded-[2rem] shadow-2xl border border-white flex flex-col items-center min-w-[200px]">
+                  <Spin size="large" />
+                  <Text strong style={{ marginTop: 20, color: THEME_COLORS.primary, letterSpacing: '1px', fontSize: '17px' }}>
+                    ĐANG ĐỒNG BỘ HỆ THỐNG
+                  </Text>
+                  <Text style={{ fontSize: '13px', color: '#94a3b8', marginTop: 4 }}>
+                    Vui lòng đợi trong giây lát
+                  </Text>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Nội dung trang: Khi loading thì làm mờ và khóa tương tác */}
           <div 

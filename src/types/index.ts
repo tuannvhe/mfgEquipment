@@ -16,11 +16,16 @@ export interface SparePart {
   name: string        // PartName
   partnum: string     // PartNumber
   spec: string        // Specification
-  qty: string         // Quantity
   replacement: string // ReplacementParts
   failure: string     // FailureHistory
   inspector: string   // Inspector
   remarks: string     // Remarks
+  sparePartCode?: string
+  qty?: string;       // Dấu ? để không bắt buộc nếu dòng đó chưa chọn linh kiện
+  selectedQty?: number;    // Qty mới bạn muốn tách ra (kiểu số để dễ tính toán)
+  stockName?: string;     // Tên kho (Kho 1/Kho 2)
+  workCenterCode?: string;
+  replacementParts?: string;
 }
 
 // Inspection chỉ dùng nội bộ FE để hiển thị bảng lịch sử KT/SC (lấy từ SparePart)
@@ -62,6 +67,7 @@ export interface Equipment {
   spareParts: SparePart[]
   inspections: Inspection[]   // FE-only: hiển thị bảng Date/Detail từ PeriodicInspections
   _serverImages?: { id: number | string; type: boolean }[]
+  workCenterCode: string;
 }
 
 export interface User {

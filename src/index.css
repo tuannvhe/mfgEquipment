@@ -137,3 +137,44 @@
   overflow: hidden;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
+/* 1. Ép chiều cao tổng thể của Select */
+.ant-select-borderless {
+  height: 20px !important; /* Khớp với line-height bạn muốn */
+}
+
+/* 2. Ép chiều cao của lớp bọc selector bên trong */
+.ant-select-borderless .ant-select-selector {
+  height: 20px !important;
+  padding: 0 !important; /* Xóa padding mặc định của Antd */
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* 3. Tinh chỉnh item hiển thị */
+.ant-select-borderless .ant-select-selection-item {
+  font-size: 12px !important; /* Giảm nhẹ 1px để không bị chạm viền trên dưới */
+  font-weight: 500 !important;
+  color: #1a3811 !important;
+  padding-left: 4px !important;
+  line-height: 20px !important; 
+  display: flex;
+  align-items: center;
+}
+
+/* 4. Fix ô Search (khi click vào để gõ) cũng phải cao 20px */
+.ant-select-borderless .ant-select-selection-search,
+.ant-select-borderless .ant-select-selection-search-input {
+  height: 20px !important;
+  line-height: 20px !important;
+}
+
+/* 5. Placeholder cũng phải khớp */
+.ant-select-borderless .ant-select-selection-placeholder {
+  font-size: 11px !important;
+  font-style: italic;
+  padding-left: 4px !important;
+  line-height: 20px !important;
+}
+
+/* Ẩn icon mũi tên để trông giống Excel hơn (tùy chọn) */
+/* .ant-select-arrow { display: none !important; } */

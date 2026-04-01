@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Table, Tag, Typography, Card, Input, Avatar, 
-  Pagination, Button, DatePicker, Divider, Empty
+  Pagination, Button, DatePicker, Divider, Empty,
+  Tooltip
 } from 'antd';
 import { 
   Clock3, Search, User, History, List, ArrowRight,
   Calendar, FilterX, Laptop, Type, Activity, ChevronRight,
   PlusCircle, FileEdit, Trash2, UserCheck,
-  MapPin
+  MapPin,
+  SlidersHorizontal
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { useAuditStore } from '../store/useAuditStore';
@@ -59,131 +61,137 @@ const updateData = (params: { page?: number; pageSize?: number; searchTerm?: str
   };
 
   const columns = [
-    {
-      title: 'THỜI GIAN CẬP NHẬT',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      width: 160,
-      fixed: 'left' as const,
-      render: (date: string) => (
-        <div className="flex flex-col group">
-          <div className="flex items-center gap-2">
-            <Calendar size={12} className="text-emerald-500" />
-            <Text className="text-slate-700 font-bold text-[13px]">{dayjs(date).format('DD/MM/YYYY')}</Text>
+          {
+            title: 'THỜI GIAN CẬP NHẬT',
+            dataIndex: 'updatedAt',
+            key: 'updatedAt',
+            width: 180,
+            fixed: 'left' as const,
+            render: (date: string) => (
+              <div className="flex flex-col gap-1.5 py-1">
+                {/* Ngày tháng với nền nhẹ */}
+                <div className="flex items-center gap-2 bg-slate-100/80 w-fit px-2.5 py-1 rounded-lg border border-slate-200/50">
+                  <Calendar size={13} className="text-emerald-500" />
+                  <span className="font-mono font-black text-[13px] text-slate-700 tracking-tighter">
+                    {dayjs(date).format('DD/MM/YYYY')}
+                  </span>
+                </div>
+                
+                {/* Giờ phút giây */}
+                <div className="flex items-center gap-1.5 text-slate-400 ml-1">
+                  <Clock3 size={11} className="text-slate-300" />
+                  <span className="text-[11px] font-bold tracking-widest uppercase italic">
+                    {dayjs(date).format('HH:mm:ss')}
+                  </span>
+                </div>
+              </div>
+            ),
+          },
+          {
+            title: 'THÔNG TIN THIẾT BỊ',
+            key: 'equipment',
+            width: 650, // Điều chỉnh độ rộng vừa đủ để dàn hàng ngang
+            render: (_: any, record: AuditLog) => (
+              <div className="flex items-center gap-4 py-2">
+                {/* Nhóm 1: Tên chính */}
+                <div className="flex items-center gap-2 bg-emerald-50/50 px-3 py-1.5 rounded-xl border border-emerald-100/50">
+                  <Laptop size={14} className="text-emerald-600" />
+                  <Text className="text-[13px] font-black text-slate-800 whitespace-nowrap">
+                    {record.equipmentTitle || "N/A"}
+                  </Text>
+                  <span className="text-[10px] font-bold text-emerald-600/60 bg-white px-1.5 py-0.5 rounded shadow-sm ml-1">
+                    {record.entityName}
+                  </span>
+                </div>
+
+                {/* Nhóm 2: Vị trí */}
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50/30 rounded-full border border-blue-100/30">
+                  <MapPin size={12} className="text-blue-500" />
+                  <span className="text-[11px] font-bold text-blue-700 whitespace-nowrap">
+                    {record.installationLocation || "N/A"}
+                  </span>
+                </div>
+
+                {/* Nhóm 3: Số kiểm soát */}
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50/30 rounded-full border border-amber-100/30">
+                  <Type size={12} className="text-amber-600" />
+                  <span className="text-[10px] font-mono font-bold text-amber-700 whitespace-nowrap">
+                    SKS: {record.controlNumber || "N/A"}
+                  </span>
+                </div>
+              </div>
+            ),
+          },
+          {
+            title: 'NHÂN VIÊN',
+            dataIndex: 'updatedBy',
+            key: 'updatedBy',
+            width: 170, // Thu hẹp lại
+            render: (user: string) => (
+              <div className="flex items-center gap-2">
+                <Avatar size={20} className="bg-emerald-100 text-emerald-600" icon={<UserCheck size={12} />} />
+                <Text className="text-[12px] font-bold text-slate-600">{user || "Hệ thống"}</Text>
+              </div>
+            ),
+          },
+          {
+            title: 'THAO TÁC',
+            dataIndex: 'action',
+            key: 'action',
+            width: 130,
+            align: 'center' as const,
+            render: (action: string) => {
+        const configs = {
+          Created: { 
+            color: 'emerald', 
+            label: 'TẠO MỚI', 
+            icon: <PlusCircle size={12} strokeWidth={3} />,
+            gradient: 'from-emerald-400 to-emerald-600',
+            shadow: 'shadow-emerald-100'
+          },
+          Modified: { 
+            color: 'amber', 
+            label: 'CHỈNH SỬA', 
+            icon: <FileEdit size={12} strokeWidth={3} />,
+            gradient: 'from-amber-400 to-amber-600',
+            shadow: 'shadow-amber-100'
+          },
+          Deleted: { 
+            color: 'rose', 
+            label: 'XÓA BỎ', 
+            icon: <Trash2 size={12} strokeWidth={3} />,
+            gradient: 'from-rose-400 to-rose-600',
+            shadow: 'shadow-rose-100'
+          },
+        }[action] || { color: 'slate', label: action, icon: null, gradient: 'from-slate-400 to-slate-600', shadow: 'shadow-slate-100' };
+
+        return (
+          <div className={`
+            inline-flex items-center gap-2 px-3 py-1.5 rounded-xl
+            bg-white border border-${configs.color}-100
+            ${configs.shadow} shadow-sm
+            group/tag transition-all duration-300 hover:scale-105
+          `}>
+            {/* Icon Circle - Điểm nhấn tròn phía trước */}
+            <div className={`
+              flex items-center justify-center w-5 h-5 rounded-lg
+              bg-gradient-to-br ${configs.gradient} text-white shadow-sm
+            `}>
+              {configs.icon}
+            </div>
+
+            {/* Text với spacing rộng và font đậm */}
+            <span className={`
+              font-black text-[10px] tracking-[0.05em]
+              text-${configs.color}-600 uppercase
+            `}>
+              {configs.label}
+            </span>
           </div>
-          <div className="flex items-center gap-1.5 text-slate-400 mt-0.5 ml-5">
-            <Clock3 size={11} />
-            <Text className="text-[11px] font-medium tracking-wide">{dayjs(date).format('HH:mm:ss')}</Text>
-          </div>
-        </div>
-      ),
-    },
-    {
-  title: 'THÔNG TIN THIẾT BỊ',
-  key: 'equipment',
-  width: 650, // Điều chỉnh độ rộng vừa đủ để dàn hàng ngang
-  render: (_: any, record: AuditLog) => (
-    <div className="flex items-center gap-4 py-2">
-      {/* Nhóm 1: Tên chính */}
-      <div className="flex items-center gap-2 bg-emerald-50/50 px-3 py-1.5 rounded-xl border border-emerald-100/50">
-        <Laptop size={14} className="text-emerald-600" />
-        <Text className="text-[13px] font-black text-slate-800 whitespace-nowrap">
-          {record.equipmentTitle || "N/A"}
-        </Text>
-        <span className="text-[10px] font-bold text-emerald-600/60 bg-white px-1.5 py-0.5 rounded shadow-sm ml-1">
-          {record.entityName}
-        </span>
-      </div>
-
-      {/* Nhóm 2: Vị trí */}
-      <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50/30 rounded-full border border-blue-100/30">
-        <MapPin size={12} className="text-blue-500" />
-        <span className="text-[11px] font-bold text-blue-700 whitespace-nowrap">
-          {record.installationLocation || "N/A"}
-        </span>
-      </div>
-
-      {/* Nhóm 3: Số kiểm soát */}
-      <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50/30 rounded-full border border-amber-100/30">
-        <Type size={12} className="text-amber-600" />
-        <span className="text-[10px] font-mono font-bold text-amber-700 whitespace-nowrap">
-          SKS: {record.controlNumber || "N/A"}
-        </span>
-      </div>
-    </div>
-  ),
-},
-   {
-  title: 'NHÂN VIÊN',
-  dataIndex: 'updatedBy',
-  key: 'updatedBy',
-  width: 170, // Thu hẹp lại
-  render: (user: string) => (
-    <div className="flex items-center gap-2">
-      <Avatar size={20} className="bg-emerald-100 text-emerald-600" icon={<UserCheck size={12} />} />
-      <Text className="text-[12px] font-bold text-slate-600">{user || "Hệ thống"}</Text>
-    </div>
-  ),
-},
-    {
-      title: 'THAO TÁC',
-      dataIndex: 'action',
-      key: 'action',
-      width: 130,
-      align: 'center' as const,
-      render: (action: string) => {
-  const configs = {
-    Created: { 
-      color: 'emerald', 
-      label: 'TẠO MỚI', 
-      icon: <PlusCircle size={12} strokeWidth={3} />,
-      gradient: 'from-emerald-400 to-emerald-600',
-      shadow: 'shadow-emerald-100'
-    },
-    Modified: { 
-      color: 'amber', 
-      label: 'CHỈNH SỬA', 
-      icon: <FileEdit size={12} strokeWidth={3} />,
-      gradient: 'from-amber-400 to-amber-600',
-      shadow: 'shadow-amber-100'
-    },
-    Deleted: { 
-      color: 'rose', 
-      label: 'XÓA BỎ', 
-      icon: <Trash2 size={12} strokeWidth={3} />,
-      gradient: 'from-rose-400 to-rose-600',
-      shadow: 'shadow-rose-100'
-    },
-  }[action] || { color: 'slate', label: action, icon: null, gradient: 'from-slate-400 to-slate-600', shadow: 'shadow-slate-100' };
-
-  return (
-    <div className={`
-      inline-flex items-center gap-2 px-3 py-1.5 rounded-xl
-      bg-white border border-${configs.color}-100
-      ${configs.shadow} shadow-sm
-      group/tag transition-all duration-300 hover:scale-105
-    `}>
-      {/* Icon Circle - Điểm nhấn tròn phía trước */}
-      <div className={`
-        flex items-center justify-center w-5 h-5 rounded-lg
-        bg-gradient-to-br ${configs.gradient} text-white shadow-sm
-      `}>
-        {configs.icon}
-      </div>
-
-      {/* Text với spacing rộng và font đậm */}
-      <span className={`
-        font-black text-[10px] tracking-[0.05em]
-        text-${configs.color}-600 uppercase
-      `}>
-        {configs.label}
-      </span>
-    </div>
-  );
-},
-    },
-    
-  ];
+        );
+      },
+    },   
+];
 
 const renderEmptyState = () => (
     <div className="py-20 flex flex-col items-center justify-center bg-slate-50/50 rounded-[40px] border-2 border-dashed border-slate-100 animate-in fade-in zoom-in duration-700">
@@ -216,7 +224,26 @@ const renderEmptyState = () => (
     const changeList = record.newValue?.split(' | ') || [];
     const isCreated = record.action === 'Created';
     const isDeleted = record.action === 'Deleted';
+    const formatValue = (val: string | null) => {
+  if (!val || val === "Trống") return "";
 
+  // 1. Kiểm tra nếu là định dạng ngày tháng từ Database (ví dụ: "4/3/2026 12:00:00 AM")
+  // Regex này nhận diện các chuỗi có định dạng ngày/tháng/năm kèm giờ
+  const dateTimeRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/; 
+  
+  if (dateTimeRegex.test(val)) {
+    const d = dayjs(val);
+    if (d.isValid()) {
+      return d.format('DD/MM/YYYY');
+    }
+  }
+
+  // 2. Việt hóa các giá trị Boolean cho dễ đọc
+  if (val.toLowerCase() === 'false') return 'Không';
+  if (val.toLowerCase() === 'true') return 'Có';
+
+  return val;
+};
     // Hàm mapping để Việt hóa tên các trường dữ liệu
     const translateProperty = (prop: string) => {
       const dictionary: Record<string, string> = {
@@ -260,6 +287,7 @@ const renderEmptyState = () => (
         'RELATIVEPATH':'ĐƯỜNG DẪN ẢNH',
         'TYPE':'LOẠI',
         'EQUIPMENTHEADER':'THIẾT BỊ',
+        'SPAREPART': 'LINH KIỆN THAY THẾ',
         '---':'TRỐNG',
       };
       return dictionary[prop.toUpperCase()] || prop;
@@ -283,26 +311,63 @@ return (
 
           return (
             <div key={index} className="bg-white/60 backdrop-blur-sm border border-white p-4 rounded-2xl shadow-sm hover:shadow-md transition-all group">
-              <div className="text-[10px] font-bold text-slate-400 uppercase mb-3 flex items-center justify-between">
+              <div className="text-[11px] font-bold text-slate-700 uppercase mb-3 flex items-center justify-between">
                 {translateProperty(propertyName)}
                 <div className="w-1.5 h-1.5 rounded-full bg-slate-200 group-hover:bg-emerald-400 transition-colors" />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 w-full py-1">
                 {oldVal && (
-                  <>
-                    <div className="flex-1 min-w-0 bg-red-50/50 p-2 rounded-lg border border-red-100/50">
-                      <div className="text-[11px] text-red-400 line-through truncate font-medium">
-                        {oldVal === "Trống" ? "---" : oldVal}
+                  <div className="flex-[1] min-w-0 group/old">
+                    <Tooltip 
+                      title={formatValue(oldVal)} 
+                      color="#64748b"
+                      overlayInnerStyle={{ borderRadius: '8px', fontSize: '11px' }}
+                    >
+                      <div className="
+                        bg-slate-100/80 border border-slate-200/60 
+                        px-3 py-2 rounded-xl transition-all
+                        hover:bg-slate-200/50 
+                      ">
+                        <div className="text-[11px] text-slate-500 truncate font-mono font-semibold  opacity-50 italic">
+                          {formatValue(oldVal)}
+                        </div>
+                      </div>
+                    </Tooltip>
+                  </div>
+                )}
+
+                {oldVal && <ArrowRight size={14} className="text-slate-300 shrink-0" />}
+                
+                <div className={`${oldVal ? 'flex-[1.2]' : 'w-full'} min-w-0`}>
+                  <Tooltip 
+                    title={formatValue(newVal)} 
+                    color="#2f977b" // Deep Emerald cho Tooltip (đậm hơn nền box)
+                    mouseEnterDelay={0.1}
+                    overlayInnerStyle={{ 
+                      borderRadius: '10px', 
+                      fontSize: '12px', 
+                      padding: '8px 12px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
+                      border: '1px solid rgba(16, 185, 129, 0.2)'
+                    }}
+                  >
+                    <div className="
+                      bg-[#065f46]  /* Deep Emerald - Đậm và sang trọng hơn */
+                      text-emerald-50 
+                      px-3 py-2 
+                      rounded-xl 
+                      border border-emerald-400/20 
+                      shadow-[0_4px_12px_-2px_rgba(6,95,70,0.3)]
+                      hover:bg-[#047857] /* Sáng lên một chút khi hover */
+                      hover:shadow-[0_6px_15px_-2px_rgba(6,95,70,0.4)]
+                      transition-all duration-300
+                    ">
+                      <div className="text-[12px] font-black truncate font-mono tracking-tight leading-tight">
+                        {formatValue(newVal)}
                       </div>
                     </div>
-                    <ArrowRight size={14} className="text-slate-300 shrink-0" />
-                  </>
-                )}
-                <div className="flex-[1.2] min-w-0 bg-emerald-50/50 p-2 rounded-lg border border-emerald-100/50">
-                  <div className="text-[12px] font-bold text-emerald-700 break-words leading-tight">
-                    {newVal}
-                  </div>
+                  </Tooltip>
                 </div>
               </div>
             </div>
@@ -317,136 +382,144 @@ return (
       
       {/* BỘ LỌC THÔNG MINH */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-  {[
-    { label: 'Tổng lưu lượng', value: totalItems, sub: 'Bản ghi hệ thống', icon: <Activity />, color: 'emerald' },
-    { label: 'Biến động 24h', value: auditStats?.new24h || 0, sub: 'Tạo mới & Sửa', icon: <History />, color: 'blue' },
-    { label: 'Dữ liệu đã xóa', value: auditStats?.deleted || 0, sub: 'Thiết bị đã xóa', icon: <Trash2 />, color: 'rose' },
-  ].map((stat, i) => {
-    // Tạo mapping class để Tailwind nhận diện được đầy đủ
-    const colorMapper = {
-      emerald: {
-        bgGradient: 'from-emerald-500 to-emerald-600',
-        bgLight: 'bg-emerald-50',
-        text: 'text-emerald-500',
-        shadow: 'shadow-emerald-200/50',
-        decor: 'group-hover:bg-emerald-500/10 bg-emerald-500/5'
-      },
-      blue: {
-        bgGradient: 'from-blue-500 to-blue-600',
-        bgLight: 'bg-blue-50',
-        text: 'text-blue-500',
-        shadow: 'shadow-blue-200/50',
-        decor: 'group-hover:bg-blue-500/10 bg-blue-500/5'
-      },
-      rose: {
-        bgGradient: 'from-rose-500 to-rose-600',
-        bgLight: 'bg-rose-50',
-        text: 'text-rose-500',
-        shadow: 'shadow-rose-200/50',
-        decor: 'group-hover:bg-rose-500/10 bg-rose-500/5'
-      }
-    }[stat.color as 'emerald' | 'blue' | 'rose'];
+        {[
+          { label: 'Tổng lưu lượng', value: totalItems, sub: 'Bản ghi hệ thống', icon: <Activity />, color: 'emerald' },
+          { label: 'Biến động 24h', value: auditStats?.new24h || 0, sub: 'Tạo mới & Sửa', icon: <History />, color: 'blue' },
+          { label: 'Dữ liệu đã xóa', value: auditStats?.deleted || 0, sub: 'Thiết bị đã xóa', icon: <Trash2 />, color: 'rose' },
+        ].map((stat, i) => {
+          // Tạo mapping class để Tailwind nhận diện được đầy đủ
+          const colorMapper = {
+            emerald: {
+              bgGradient: 'from-emerald-500 to-emerald-600',
+              bgLight: 'bg-emerald-50',
+              text: 'text-emerald-500',
+              shadow: 'shadow-emerald-200/50',
+              decor: 'group-hover:bg-emerald-500/10 bg-emerald-500/5'
+            },
+            blue: {
+              bgGradient: 'from-blue-500 to-blue-600',
+              bgLight: 'bg-blue-50',
+              text: 'text-blue-500',
+              shadow: 'shadow-blue-200/50',
+              decor: 'group-hover:bg-blue-500/10 bg-blue-500/5'
+            },
+            rose: {
+              bgGradient: 'from-rose-500 to-rose-600',
+              bgLight: 'bg-rose-50',
+              text: 'text-rose-500',
+              shadow: 'shadow-rose-200/50',
+              decor: 'group-hover:bg-rose-500/10 bg-rose-500/5'
+            }
+          }[stat.color as 'emerald' | 'blue' | 'rose'];
 
-    return (
-      <div key={i} className="group relative bg-white rounded-[2rem] p-1 transition-all duration-500 hover:-translate-y-2 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-slate-100/80 overflow-hidden">
-        {/* Background Decor - Sửa class nối chuỗi */}
-        <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full blur-2xl transition-colors ${colorMapper.decor}`} />
-        
-        <div className="relative flex items-center gap-5 p-5">
-          {/* Icon Box - Sửa class nối chuỗi */}
-          <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${colorMapper.bgGradient} flex items-center justify-center text-white shadow-lg ${colorMapper.shadow} transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}>
-            {React.cloneElement(stat.icon as React.ReactElement, { size: 28, strokeWidth: 2.5 })}
-          </div>
-          
-          <div className="flex flex-col">
-            <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1">{stat.label}</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-3xl font-black text-slate-800 tracking-tight">{stat.value.toLocaleString()}</span>
-              {/* Badge - Sửa class nối chuỗi */}
-              <span className={`text-[10px] font-bold ${colorMapper.text} ${colorMapper.bgLight} px-1.5 py-0.5 rounded-md uppercase`}>Items</span>
+          return (
+            <div key={i} className="group relative bg-white rounded-[2rem] p-1 transition-all duration-500 hover:-translate-y-2 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-slate-100/80 overflow-hidden">
+              {/* Background Decor - Sửa class nối chuỗi */}
+              <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full blur-2xl transition-colors ${colorMapper.decor}`} />
+              
+              <div className="relative flex items-center gap-5 p-5">
+                {/* Icon Box - Sửa class nối chuỗi */}
+                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${colorMapper.bgGradient} flex items-center justify-center text-white shadow-lg ${colorMapper.shadow} transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}>
+                  {React.cloneElement(stat.icon as React.ReactElement, { size: 28, strokeWidth: 2.5 })}
+                </div>
+                
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1">{stat.label}</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-3xl font-black text-slate-800 tracking-tight">{stat.value.toLocaleString()}</span>
+                    {/* Badge - Sửa class nối chuỗi */}
+                    <span className={`text-[10px] font-bold ${colorMapper.text} ${colorMapper.bgLight} px-1.5 py-0.5 rounded-md uppercase`}>Items</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium mt-1 opacity-70">{stat.sub}</span>
+                </div>
+              </div>
             </div>
-            <span className="text-[10px] text-slate-400 font-medium mt-1 opacity-70">{stat.sub}</span>
-          </div>
-        </div>
+          );
+        })}
       </div>
-    );
-  })}
-</div>
       <Card className="border-none rounded-[32px] bg-white/90 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.04)] ring-1 ring-slate-100/50" styles={{ body: { padding: '24px' } }}>
         <div className="flex items-center gap-3 mb-8">
           <div className="p-2.5 bg-emerald-500 rounded-2xl text-white shadow-lg shadow-emerald-200">
-            <History size={22} />
+            <SlidersHorizontal size={22} /> 
+            {/* Hoặc dùng <Search size={22} /> nếu bạn muốn hình kính lúp */}
           </div>
           <div>
-            <h2 className="text-xl font-black text-slate-800 tracking-tight leading-none text-emerald-900">Nhật ký hệ thống</h2>
-            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mt-1">Lịch sử thao tác & Biến động dữ liệu</p>
+            <h2 className="text-xl font-black text-slate-800 tracking-tight leading-none text-emerald-900">Bộ lọc</h2>
           </div>
           <div className="h-px flex-1 bg-gradient-to-r from-slate-100 to-transparent ml-6" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Ô Tìm kiếm */}
-        <div className="md:col-span-2 space-y-1.5">
-          <div className="flex items-center gap-2 text-slate-500 ml-1">
-            <Search size={12} className="text-emerald-500" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Tìm kiếm thiết bị</span>
-          </div>
-          <Input 
-            placeholder="Mã kiểm soát / Tên thiết bị..." 
-            value={searchControl}
-            onChange={e => setSearchControl(e.target.value)}
-            // Giảm chiều cao xuống h-10, bo góc xl (12px)
-            className="h-10 rounded-xl bg-slate-50/50 border-slate-100 hover:border-emerald-300 focus:bg-white transition-all text-[13px]"
-            allowClear
-            onPressEnter={() => updateData({ page: 1 })}
-          />
-        </div>
-
-        {/* Bộ chọn Ngày */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-slate-500 ml-1">
-            <Calendar size={12} className="text-purple-500" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Thời Gian</span>
-          </div>
-          <RangePicker 
-            className="w-full h-10 rounded-xl bg-slate-50/50 border-slate-100 hover:border-emerald-300 focus:bg-white transition-all text-[13px]"
-            format="DD/MM/YYYY"
-            presets={rangePresets}
-            value={dateRange ? [dayjs(dateRange[0]), dayjs(dateRange[1])] : null}
-            onChange={(dates) => {
-              if (dates?.[0] && dates?.[1]) {
-                setDateRange([dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')]);
-              } else {
-                setDateRange(undefined);
-              }
-            }}
-          />
-        </div>
-
-        {/* Nút bấm */}
-        <div className="flex items-end gap-2">
-          <Button 
-            type="primary" 
-            icon={<Search size={16} strokeWidth={3} />}
-            onClick={() => updateData({ page: 1, searchTerm: searchControl })}
-            loading={loading}
-            style={{ backgroundColor: '#10b981' }}
-            // Giảm chiều cao nút h-10, chữ bé lại
-            className="h-10 px-6 font-black text-[11px] rounded-xl border-none shadow-md flex items-center justify-center grow transition-all hover:scale-[1.02] active:scale-95"
-          >
-            LỌC DỮ LIỆU
-          </Button>
-          
-          {(searchControl || dateRange) && (
-            <Button 
-              icon={<FilterX size={18} />} 
-              onClick={handleReset} 
-              // Nút reset cũng nhỏ lại tương ứng h-10 w-10
-              className="h-10 w-10 rounded-xl bg-red-50 text-red-500 border-none hover:bg-red-100 flex items-center justify-center shrink-0" 
+          {/* Ô Tìm kiếm */}
+          <div className="md:col-span-2 space-y-1.5">
+            <div className="flex items-center gap-2 text-slate-500 ml-1">
+              <Search size={12} className="text-emerald-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Tìm kiếm thiết bị</span>
+            </div>
+            <Input 
+              placeholder="Mã kiểm soát / Tên thiết bị..." 
+              value={searchControl}
+              onChange={e => setSearchControl(e.target.value)}
+              // Giảm chiều cao xuống h-10, bo góc xl (12px)
+              className="h-10 rounded-xl bg-slate-50/50 border-slate-100 hover:border-emerald-300 focus:bg-white transition-all text-[13px]"
+              allowClear
+              onPressEnter={() => updateData({ page: 1 })}
             />
-          )}
+          </div>
+
+          {/* Bộ chọn Ngày */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-slate-500 ml-1">
+              <Calendar size={12} className="text-purple-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Thời Gian</span>
+            </div>
+            <RangePicker 
+              className="w-full h-10 rounded-xl bg-slate-50/50 border-slate-100 hover:border-emerald-300 focus:bg-white transition-all text-[13px]"
+              format="DD/MM/YYYY"
+              presets={rangePresets}
+              value={dateRange ? [dayjs(dateRange[0]), dayjs(dateRange[1])] : null}
+              onChange={(dates) => {
+                if (dates?.[0] && dates?.[1]) {
+                  setDateRange([dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')]);
+                } else {
+                  setDateRange(undefined);
+                }
+              }}
+            />
+          </div>
+
+          {/* Nút bấm */}
+          <div className="flex items-end gap-2">
+            <Button 
+              onClick={() => {
+                fetchLogs({ 
+                  page: 1, 
+                  pageSize: pageSize,
+                  searchTerm: searchControl || undefined,
+                  startDate: dateRange ? dateRange[0] : undefined,
+                  endDate: dateRange ? dateRange[1] : undefined
+                });
+              }} 
+              type="primary" 
+              loading={loading}
+              className="h-10 w-full rounded-xl bg-emerald-500 border-none shadow-lg shadow-emerald-100 font-bold hover:bg-emerald-600 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+            >
+              <div className="flex items-center gap-2">
+                {!loading && <Search size={18} strokeWidth={2.5} />}
+                <span className="uppercase tracking-wider text-[13px]">Tìm kiếm</span>
+              </div>
+            </Button>
+            
+            {(searchControl || dateRange) && (
+              <Button 
+                icon={<FilterX size={18} />} 
+                onClick={handleReset} 
+                // Nút reset cũng nhỏ lại tương ứng h-10 w-10
+                className="h-10 w-10 rounded-xl bg-red-50 text-red-500 border-none hover:bg-red-100 flex items-center justify-center shrink-0" 
+              />
+            )}
+          </div>
         </div>
-      </div>
       </Card>
 
       {/* BẢNG DỮ LIỆU */}
@@ -528,78 +601,60 @@ return (
       </div>
 
      <style>{`
-  /* Ẩn scrollbar nhưng vẫn scroll được */
-  .custom-audit-table .ant-table-body::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  .custom-audit-table .ant-table-body::-webkit-scrollbar-thumb {
-    background: #e2e8f0;
-    border-radius: 10px;
-  }
+        /* Ẩn scrollbar nhưng vẫn scroll được */
+        .custom-audit-table .ant-table-body::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .custom-audit-table .ant-table-body::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 10px;
+        }
 
-  /* Hiệu ứng Glass cho Header */
-  .custom-audit-table .ant-table-thead > tr > th {
-    background: #f8fafc !important;
-    color: #475569 !important;
-    font-size: 11px !important;
-    font-weight: 800 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.1em !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-    padding: 18px 24px !important;
-  }
+        /* Hiệu ứng Glass cho Header */
+        .custom-audit-table .ant-table-thead > tr > th {
+          background: #f8fafc !important;
+          color: #475569 !important;
+          font-size: 11px !important;
+          font-weight: 800 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.1em !important;
+          border-bottom: 1px solid #f1f5f9 !important;
+          padding: 18px 24px !important;
+        }
 
-  /* Border radius cho Table */
-  .custom-audit-table {
-    border-radius: 24px;
-    overflow: hidden;
-  }
+        /* Border radius cho Table */
+        .custom-audit-table {
+          border-radius: 24px;
+          overflow: hidden;
+        }
 
-  /* Row Hover Effect */
-  .ant-table-row {
-    transition: all 0.3s ease !important;
-  }
-  .ant-table-row:hover > td {
-    background-color: #f0fdf4/50 !important;
-  }
+        /* Row Hover Effect */
+        .ant-table-row {
+          transition: all 0.3s ease !important;
+        }
+        .ant-table-row:hover > td {
+          background-color: #f0fdf4/50 !important;
+        }
 
-  /* Custom Pagination */
-  // .custom-pagination .ant-pagination-item {
-  //   border-radius: 12px !important;
-  //   border: none !important;
-  //   background: #f1f5f9 !important;
-  //   font-weight: bold !important;
-  // }
-  // .custom-pagination .ant-pagination-item-active {
-  //   background: #0add97 !important;
-  //   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
-  // }
-  .custom-pagination .ant-pagination-prev .ant-pagination-item-link,
-  .custom-pagination .ant-pagination-next .ant-pagination-item-link {
-    border-radius: 12px !important;
-    border: none !important;
-    background: #f1f5f9 !important;
-  }
-    /* Tùy chỉnh panel của DatePicker */
-.ant-picker-dropdown .ant-picker-presets > ul > li {
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  color: #64748b !important;
-  transition: all 0.2s;
-}
-
-.ant-picker-dropdown .ant-picker-presets > ul > li:hover {
-  color: #10b981 !important; /* Màu Emerald đồng bộ với UI */
-  background: #f0fdf4;
-}
-
-.ant-picker-range-wrapper {
-  border-radius: 1.5rem !important;
-  overflow: hidden;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-`}</style>
+        /* Custom Pagination */
+        // .custom-pagination .ant-pagination-item {
+        //   border-radius: 12px !important;
+        //   border: none !important;
+        //   background: #f1f5f9 !important;
+        //   font-weight: bold !important;
+        // }
+        // .custom-pagination .ant-pagination-item-active {
+        //   background: #0add97 !important;
+        //   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
+        // }
+        .custom-pagination .ant-pagination-prev .ant-pagination-item-link,
+        .custom-pagination .ant-pagination-next .ant-pagination-item-link {
+          border-radius: 12px !important;
+          border: none !important;
+          background: #f1f5f9 !important;
+        }
+      `}</style>
     </div>
   );
 };
