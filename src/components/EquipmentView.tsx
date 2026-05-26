@@ -295,7 +295,7 @@ useLayoutEffect(() => {
 
               {/* SECTION: LỊCH SỬ HƯ HỎNG */}
               <tr className={`${TITLE_BG} text-center font-bold uppercase text-[8px] leading-tight h-8`}>
-                <td className="border border-black">Date of Insp.<br/>Ngày kiểm tra/SC</td>
+                <td className="border border-black">Date of Insp.<br/>Ngày kiểm tra</td>
                 <td colSpan={3} className="border border-black">Inspection Details<br/>Nội dung kiểm tra / Sự cố</td>
                 <td className="border border-black">Failure History<br/>Lịch sử hư hỏng</td>
                 <td className="border border-black">Replacement Parts<br/>Linh kiện thay thế</td>
@@ -304,14 +304,28 @@ useLayoutEffect(() => {
               </tr>
 
               {data.spareParts?.map((historyItem: any, i: number) => {
+                //console.log(historyItem)
                 const inspectionItem = data.periodicInspections?.[i];
-                if (!historyItem?.failureHistory && !inspectionItem?.inspectionDetails) return null;
+                if (!historyItem?.failureHistory && !inspectionItem?.inspectionDetails && !historyItem?.replacementParts) {
+                      return null;
+                  }
                 return (
                   <tr key={`history-${historyItem.id || i}`} className="h-8 text-center text-[9px]">
                     <td className="border border-black">{formatDate(inspectionItem?.dateOfInspection) || ''}</td>
                     <td colSpan={3} className="border border-black px-1 text-left">{inspectionItem?.inspectionDetails || ''}</td>
                     <td className="border border-black">{historyItem?.failureHistory || ''}</td>
-                    <td className="border border-black">{historyItem?.replacementParts || ''}</td>
+                    <td className="border border-black px-2 py-1 text-left">
+                      {/* Hiển thị tên linh kiện */}
+                      <span>{historyItem?.replacementParts || ''}</span>
+                      
+                      {/* Hiển thị số lượng ngay sau nếu có giá trị */}
+                      {historyItem?.selectedQty > 0 && (
+                        <span className=" text-[10px] ml-1">
+                          (SL: {historyItem.selectedQty})
+                        </span>
+                      )}
+                    </td>
+                    
                     <td className="border border-black ">{historyItem?.inspector || ''}</td>
                     <td className="border border-black">{historyItem?.remarks || ''}</td>
                   </tr>

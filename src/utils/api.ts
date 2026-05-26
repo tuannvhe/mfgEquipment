@@ -1,6 +1,7 @@
 import axios from 'axios'
 
-const API_URL ='http://localhost:6004/api'
+const API_URL ='http://localhost:6008/api'
+//http://192.168.112.254:6008/
 
 const api = axios.create({
   baseURL: `${API_URL}`,
@@ -10,7 +11,6 @@ const api = axios.create({
    withCredentials:true
 })
 
-// Request interceptor: attach token to headers
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token')
@@ -22,7 +22,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// Response interceptor: handle 401 and refresh token
 api.interceptors.response.use(
   (response) => response,
   async (error) => {

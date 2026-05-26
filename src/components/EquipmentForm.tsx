@@ -190,6 +190,8 @@ export default function EquipmentForm({ initialData, isNew, onSave, onDelete, on
               failure: item.failureHistory || item.failure || '',
               inspector: item.inspector || '',
               remarks: item.remarks || '',
+              sparePartCode: item.sparePartCode || '',
+              selectedQty: item.selectedQty || '',
             })),
         }))
       })
@@ -285,8 +287,8 @@ const handleSave = async () => {
   );
 
   try {
-    console.log("=== DỮ LIỆU THỰC TẾ GỬI ĐI (PAYLOAD) ===");
-    console.log(cleanForm); // Log cleanForm, đừng log 'form' vì 'form' là state cũ
+    // console.log("=== DỮ LIỆU THỰC TẾ GỬI ĐI (PAYLOAD) ===");
+    // console.log(cleanForm); // Log cleanForm, đừng log 'form' vì 'form' là state cũ
 
     const savedData = await onSave(cleanForm); 
     
@@ -332,6 +334,8 @@ const handleSave = async () => {
       replacement: s?.replacement || '',
       inspector: s?.inspector || '',
       remarks: s?.remarks || '',
+      sparePartCode: s?.sparePartCode || '',
+      selectedQty: s?.selectedQty || '',
     }
   }
   const setInsp = (i: number, key: string, val: string) => {
@@ -847,7 +851,7 @@ const handlePartSelect = (
                             const s = getSPart(i);
                             return (
                               <tr key={`s_${i}`} className="group">
-                                <td 
+                                {/* <td 
                                   className="border-b border-r border-black bg-white p-0 align-middle cursor-pointer hover:bg-blue-50 group relative"
                                   onClick={() => {
                                     setEditingIndex(i);
@@ -860,7 +864,6 @@ const handlePartSelect = (
                                       {s.name || <span className="text-gray-400 italic">Chọn...</span>}
                                     </span>
 
-                                    {/* Nút xóa hiện lên khi hover vào ô */}
                                     {s.name && (
                                       <button
                                         className="hidden group-hover:block ml-1 text-gray-400 hover:text-red-500 font-bold px-1"
@@ -875,7 +878,11 @@ const handlePartSelect = (
                                     
                                     <span className="text-gray-400 text-[10px] ml-1 shrink-0">▼</span>
                                   </div>
+                                </td> */
+                                <td className="border-b border-r border-black bg-white p-0 align-middle">
+                                  <ExcelInput value={s.name} onChange={(v: string) => setSPart(i, 'name', v)} className={`font-mono text-blue-800 ${inputClass}`} />
                                 </td>
+                                }
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
                                   <ExcelInput value={s.partnum} onChange={(v: string) => setSPart(i, 'partnum', v)} className={`font-mono text-blue-800 ${inputClass}`} />
                                 </td>
@@ -910,38 +917,77 @@ const handlePartSelect = (
                                 <td className="border-b border-r border-black bg-white p-0  align-middle">
                                   <ExcelInput value={r.failure} onChange={(v: string) => setInsp(i, 'failure', v)} className={inputClass} />
                                 </td>
-                                <td 
-                                  className="border-b border-r border-black bg-white p-0 align-middle cursor-pointer hover:bg-blue-50 group relative"
-                                  onClick={() => {
-                                    setEditingIndex(i);
-                                    setEditingField('replacement');
-                                    setIsModalOpen(true);
-                                  }}
-                                >
-                                  <div className="flex justify-between items-center px-2 min-h-[32px] text-[12px]">
-                                    {/* Tooltip chỉ bao bọc phần text để hiện nội dung đầy đủ */}
-                                    <Tooltip title={r.replacement} mouseEnterDelay={0.5}>
-                                      <span className="truncate flex-1 py-1">
-                                        {r.replacement  || <span className="text-gray-400 italic">Chọn...</span>}
-                                      </span>
-                                    </Tooltip>
+                              <td 
+                                className="border-b border-r border-black bg-white p-0 align-middle cursor-pointer hover:bg-indigo-50/50 group relative transition-colors duration-200"
+                                onClick={() => {
+                                  setEditingIndex(i);
+                                  setEditingField('replacement');
+                                  setIsModalOpen(true);
+                                }}
+                              >
+                                <div className="flex justify-between items-center px-3 min-h-[36px]">
+                                  
+                                  <Tooltip 
+                                    placement="topLeft"
+                                    color="#01561b" 
+                                    title={
+                                      r.replacement ? (
+                                        <div className="p-1 text-[12px] leading-relaxed">
+                                          <div className="flex items-center gap-2 mb-2 pb-1 border-b border-slate-600">
+                                            <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                                            <span className="font-bold text-blue-100 uppercase tracking-wider">Thông tin linh kiện</span>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <p><span className="text-slate-400">Tên:</span> <span className="text-white">{r.replacement}</span></p>
+                                            <p><span className="text-slate-400">Mã linh kiện:</span> <span className="font-mono text-emerald-400">{r.sparePartCode || 'N/A'}</span></p>
+                                            <p><span className="text-slate-400">SL yêu cầu:</span> <span className="bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded text-[11px] font-bold">{r.selectedQty || 0}</span></p>
+                                          </div>
+                                        </div>
+                                      ) : "Click để chọn linh kiện"
+                                    } 
+                                    mouseEnterDelay={0.4}
+                                  >
+                                    <div className="flex-1 flex flex-col overflow-hidden py-1">
+                                      {r.replacement ? (
+                                        <>
+                                          <span className="text-[12px] font-semibold text-slate-700 truncate leading-tight">
+                                            {r.replacement}
+                                          </span>
+                                          {/* {r.sparePartCode && (
+                                            <span className="text-[10px] text-slate-400 font-mono truncate">
+                                              {r.sparePartCode}
+                                            </span>
+                                          )} */}
+                                        </>
+                                      ) : (
+                                        <span className="text-gray-400 italic text-[12px] flex items-center gap-1">
+                                          Chọn linh kiện...
+                                        </span>
+                                      )}
+                                    </div>
+                                  </Tooltip>
 
-                                    {/* Nút xóa */}
+                                  <div className="flex items-center gap-1 ml-2">
+                                    {/* Nút xóa được thiết kế lại: Tròn và nổi bật khi hover */}
                                     {r.replacement && (
                                       <button
-                                        className="hidden group-hover:block ml-1 text-gray-400 hover:text-red-500 font-bold px-1"
+                                        className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-5 h-5 rounded-full hover:bg-red-100 text-gray-400 hover:text-red-500 transition-all duration-200 shadow-sm"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleClearField(i, 'replacement'); 
                                         }}
                                       >
-                                        ✕
+                                        <span className="text-[14px] leading-none">×</span>
                                       </button>
                                     )}
                                     
-                                    <span className="text-gray-400 text-[10px] ml-1 shrink-0">▼</span>
+                                    {/* Icon mũi tên nhỏ tinh tế */}
+                                    <span className="text-slate-300 text-[9px] group-hover:text-blue-400 transition-colors">
+                                      ▼
+                                    </span>
                                   </div>
-                                </td>
+                                </div>
+                              </td>
                                 <td className="border-b border-r border-black bg-white p-0 align-middle">
                                   <ExcelInput value={r.inspector} onChange={(v: string) => setInsp(i, 'inspector', v)} className={inputClass} />
                                 </td>
@@ -1033,6 +1079,7 @@ const handlePartSelect = (
             initialWC={selectedWC} 
             onCancel={() => setIsModalOpen(false)}
             onSelect={handlePartSelect}
+            isQueryMode={false} // QUAN TRỌNG: Sẽ bỏ qua modal xác nhận số lượng
           />   
         </div>
       </div>

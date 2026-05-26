@@ -45,6 +45,7 @@ const EMPTY_EQ = (): Equipment => ({
   mfgname: '', eqtitle: '', model: '', serial: '', mfgdate: '',
   weight: '', power: '', size: '', makeraddr: '',
   periodicItems: [], inspections: [], spareParts: [],
+  workCenterCode: ''
 })
 
 interface Props {

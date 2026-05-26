@@ -4,6 +4,7 @@ import {
   message, notification, Tag, InputNumber, Radio, Divider 
 } from 'antd';
 import api from '../utils/api';
+import { Search, SearchIcon } from 'lucide-react';
 
 interface Props {
   visible: boolean;
@@ -17,6 +18,7 @@ interface Props {
     workCenterCode: string
   ) => void;
   initialWC?: string;
+  isQueryMode?: boolean;
 }
 
 interface SparePartRecord {
@@ -31,25 +33,63 @@ interface SparePartRecord {
   stockName?: string;
 }
 
-const SparePartModal = ({ visible, onCancel, onSelect, initialWC }: Props) => {
-  // State tìm kiếm
+const SparePartModal = ({ visible, onCancel, onSelect, initialWC, isQueryMode = false  }: Props) => {
   const [wc, setWc] = useState<string | undefined>(initialWC);
   const [searchText, setSearchText] = useState('');
   const [data, setData] = useState<SparePartRecord[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // State xử lý chọn số lượng & kho
   const [qtyModalVisible, setQtyModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<SparePartRecord | null>(null);
   const [selectedStorage, setSelectedStorage] = useState<'stock1' | 'stock2'>('stock1');
   const [tempQty, setTempQty] = useState<number>(1);
+  
+  const emptyRender = (
+  <div className="py-12 flex flex-col items-center justify-center bg-slate-50/50 rounded-[24px] border-2 border-dashed border-slate-100 animate-in fade-in zoom-in duration-700">
+    {/* Icon Search với hiệu ứng nhảy bounce */}
+    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg mb-4 animate-bounce">
+      <Search size={32} className="text-slate-300" />
+    </div>
 
-  // Hàm gọi API tìm kiếm
+    {/* Thông báo chính */}
+    <h3 className="text-lg font-bold text-slate-700">Không tìm thấy linh kiện</h3>
+    
+    {/* Thông báo phụ */}
+    <p className="text-slate-400 mt-1 text-center text-xs px-10">
+      Vui lòng kiểm tra lại mã linh kiện hoặc chọn xưởng (WC) khác
+    </p>
+
+    {/* Nút reset tìm kiếm trong Modal */}
+    {searchText && (
+      <Button 
+        onClick={() => {
+          setSearchText('');
+          setData([]);
+        }} 
+        className="mt-4 h-9 px-6 rounded-xl font-bold bg-slate-200 text-slate-600 border-none hover:bg-slate-300 transition-colors"
+      >
+        XÓA TÌM KIẾM
+      </Button>
+    )}
+  </div>
+);
+  // --- HÀM CLEAR DỮ LIỆU ---
+const resetStates = () => {
+    // Chỉ reset những thứ cần thiết sau khi đóng hẳn
+    setSearchText('');
+    setData([]);
+    setLoading(false);
+    setSelectedRecord(null);
+  };
+
   const handleSearch = useCallback(async (targetWc?: string, targetSearch?: string) => {
-    const activeWc = targetWc || wc;
+    // Ưu tiên targetWc truyền vào, sau đó đến state wc
+    const activeWc = targetWc !== undefined ? targetWc : wc;
     const activeSearch = targetSearch !== undefined ? targetSearch : searchText;
 
-    if (!activeWc) {
+    // Nếu không có WC và không phải mode truy vấn thì mới chặn
+    if (!activeWc && !isQueryMode) {
+      message.warning("Vui lòng chọn xưởng (WC) trước khi tìm kiếm!");
       setData([]);
       return;
     }
@@ -66,82 +106,81 @@ const SparePartModal = ({ visible, onCancel, onSelect, initialWC }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [wc, searchText]);
+  }, [wc, searchText, isQueryMode]);
 
-  // Tự động load dữ liệu khi mở Modal nếu đã có xưởng (Work Center)
   useEffect(() => {
-    if (visible && initialWC && data.length === 0) {
+    if (visible) {
+      // Chỉ set một lần khi mở modal
       setWc(initialWC);
-      handleSearch(initialWC);
+      if (initialWC) {
+        handleSearch(initialWC, ''); 
+      }
+    } else {
+      // Khi đóng modal thì xóa trắng dữ liệu để lần sau mở lại không bị "nháy" dữ liệu cũ
+      setData([]);
+      setSearchText('');
     }
-  }, [visible, initialWC, handleSearch, data.length]);
-
-  // Khi người dùng click vào một dòng trong bảng
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+  
   const handleRowClick = (record: SparePartRecord) => {
+    // 1. Nếu là Chế độ Tìm kiếm/Lọc (isQueryMode = true)
+    if (isQueryMode) {
+      // Trả dữ liệu về ngay, không hiện modal chọn số lượng/kho
+      onSelect(record, 0, "", record.sparePartCode, wc || "");
+      onCancel();
+      return;
+    }
+
+    // 2. Nếu là Chế độ Nhập liệu (Replacement)
     if (record.totalStockQty <= 0) {
       notification.warning({
         message: 'Hết linh kiện',
         description: `Linh kiện "${record.sparePartName}" hiện không còn trong kho.`,
-        placement: 'topRight'
       });
       return;
     }
 
     setSelectedRecord(record);
     setTempQty(1);
-    // Ưu tiên chọn kho nào còn hàng trước
     setSelectedStorage(record.currentStock1Qty > 0 ? 'stock1' : 'stock2');
     setQtyModalVisible(true);
   };
 
   const confirmSelection = () => {
-  // Thêm kiểm tra 'wc' và 'selectedRecord.sparePartCode'
-  if (selectedRecord && selectedRecord.sparePartCode && wc) { 
-    const maxAvailable = selectedStorage === 'stock1' 
-      ? selectedRecord.currentStock1Qty 
-      : selectedRecord.currentStock2Qty;
-
-    if (tempQty > maxAvailable) {
-      message.error(`Số lượng vượt quá tồn kho khả dụng`);
-      return;
+    if (selectedRecord && selectedRecord.sparePartCode && wc) { 
+      const maxAvailable = selectedStorage === 'stock1' ? selectedRecord.currentStock1Qty : selectedRecord.currentStock2Qty;
+      if (tempQty > maxAvailable) {
+        message.error(`Số lượng vượt quá tồn kho khả dụng`);
+        return;
+      }
+      onSelect(selectedRecord, tempQty, selectedStorage === 'stock1' ? 'Kho 1' : 'Kho 2', selectedRecord.sparePartCode, wc);
+      setQtyModalVisible(false);
+      onCancel(); 
     }
+  };
 
-    const storageName = selectedStorage === 'stock1' ? 'Kho 1' : 'Kho 2';
-
-    // TypeScript sẽ không báo lỗi nữa vì đã check != undefined ở trên
-    onSelect(
-      selectedRecord, 
-      tempQty, 
-      storageName, 
-      selectedRecord.sparePartCode, 
-      wc
-    );
-    
-    setQtyModalVisible(false);
-    onCancel(); 
-  } else {
-    // Thông báo cho người dùng nếu thiếu thông tin
-    if (!wc) message.warning("Vui lòng chọn xưởng (WC)!");
-  }
-};
-
-  return (
+ return (
     <>
-      {/* MODAL CHÍNH: DANH SÁCH LINH KIỆN */}
       <Modal
         title={<div className="text-blue-600 font-bold text-lg">🔍 Tra cứu linh kiện thay thế</div>}
         open={visible}
         onCancel={onCancel}
+        // --- QUAN TRỌNG: Clear dữ liệu sau khi đóng hẳn Modal ---
+        afterClose={resetStates} 
         footer={null}
         width={1000}
-        destroyOnClose={false}
+        // Khuyên dùng true để DOM sạch sẽ hơn
+        destroyOnClose={true} 
       >
+        {/* Nội dung Modal chính */}
         <div className="flex gap-2 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
-          <Select 
+           <Select 
             style={{ width: 220 }} 
             placeholder="📍 Chọn xưởng (WC)"
             value={wc}
             allowClear
+            // Khi clear WC thì xóa luôn data trong bảng
             onChange={(v) => { setWc(v); setData([]); }}
             options={[
               { label: 'Bắc Ninh (VVT_F1)', value: 'VVT_F1' },
@@ -174,6 +213,9 @@ const SparePartModal = ({ visible, onCancel, onSelect, initialWC }: Props) => {
           loading={loading}
           size="small"
           rowKey="sparePartCode"
+          locale={{
+            emptyText: emptyRender
+          }}
           pagination={{ pageSize: 8, showSizeChanger: false }}
           onRow={(record) => ({
             onClick: () => handleRowClick(record),
@@ -216,7 +258,8 @@ const SparePartModal = ({ visible, onCancel, onSelect, initialWC }: Props) => {
       </Modal>
 
       {/* MODAL PHỤ: CHỌN KHO & SỐ LƯỢNG */}
-      <Modal
+      {!isQueryMode && (
+        <Modal
         title="Xác nhận số lượng & Kho lấy linh kiện"
         open={qtyModalVisible}
         onCancel={() => setQtyModalVisible(false)}
@@ -285,6 +328,7 @@ const SparePartModal = ({ visible, onCancel, onSelect, initialWC }: Props) => {
           </div>
         </div>
       </Modal>
+      )}
     </>
   );
 };

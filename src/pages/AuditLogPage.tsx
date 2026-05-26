@@ -79,7 +79,7 @@ const updateData = (params: { page?: number; pageSize?: number; searchTerm?: str
                 
                 {/* Giờ phút giây */}
                 <div className="flex items-center gap-1.5 text-slate-400 ml-1">
-                  <Clock3 size={11} className="text-slate-300" />
+                  <Clock3 size={12} className="text-slate-500" />
                   <span className="text-[11px] font-bold tracking-widest uppercase italic">
                     {dayjs(date).format('HH:mm:ss')}
                   </span>
@@ -116,7 +116,7 @@ const updateData = (params: { page?: number; pageSize?: number; searchTerm?: str
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50/30 rounded-full border border-amber-100/30">
                   <Type size={12} className="text-amber-600" />
                   <span className="text-[10px] font-mono font-bold text-amber-700 whitespace-nowrap">
-                    SKS: {record.controlNumber || "N/A"}
+                    Số kiểm soát: {record.controlNumber || "N/A"}
                   </span>
                 </div>
               </div>
@@ -225,8 +225,7 @@ const renderEmptyState = () => (
     const isCreated = record.action === 'Created';
     const isDeleted = record.action === 'Deleted';
     const formatValue = (val: string | null) => {
-  if (!val || val === "Trống") return "";
-
+    if (!val || val === "Trống" || val === "null") return null;
   // 1. Kiểm tra nếu là định dạng ngày tháng từ Database (ví dụ: "4/3/2026 12:00:00 AM")
   // Regex này nhận diện các chuỗi có định dạng ngày/tháng/năm kèm giờ
   const dateTimeRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/; 
@@ -239,8 +238,8 @@ const renderEmptyState = () => (
   }
 
   // 2. Việt hóa các giá trị Boolean cho dễ đọc
-  if (val.toLowerCase() === 'false') return 'Không';
-  if (val.toLowerCase() === 'true') return 'Có';
+  if (val.toLowerCase() === 'false') return '';
+  if (val.toLowerCase() === 'true') return '';
 
   return val;
 };
@@ -289,16 +288,19 @@ const renderEmptyState = () => (
         'EQUIPMENTHEADER':'THIẾT BỊ',
         'SPAREPART': 'LINH KIỆN THAY THẾ',
         '---':'TRỐNG',
+        'CREATIONTIME':'THỜI GIAN CẬP NHẬT'
       };
       return dictionary[prop.toUpperCase()] || prop;
     };
 
 return (
-    <div className="bg-slate-50/40 p-8 rounded-[2.5rem] border border-slate-100 m-2 relative">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="h-8 w-1.5 bg-emerald-500 rounded-full" />
-        <h4 className="text-[14px] font-black text-slate-700 uppercase tracking-wider">
-          Chi tiết thay đổi thuộc tính
+    <div className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 m-2 shadow-inner">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-100">
+          <Activity size={16} className="text-slate-400" />
+        </div>
+        <h4 className="text-[13px] font-black text-slate-600 uppercase tracking-widest">
+          Chi tiết các thay đổi dữ liệu
         </h4>
       </div>
 
@@ -310,62 +312,37 @@ return (
           const [oldVal, newVal] = hasArrow ? valuePart.split(' -> ') : [null, valuePart];
 
           return (
-            <div key={index} className="bg-white/60 backdrop-blur-sm border border-white p-4 rounded-2xl shadow-sm hover:shadow-md transition-all group">
-              <div className="text-[11px] font-bold text-slate-700 uppercase mb-3 flex items-center justify-between">
-                {translateProperty(propertyName)}
-                <div className="w-1.5 h-1.5 rounded-full bg-slate-200 group-hover:bg-emerald-400 transition-colors" />
+            <div key={index} className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:border-blue-200 transition-all group">
+              {/* Tên thuộc tính */}
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[12px] font-black text-slate-800 uppercase tracking-tight">
+                  {translateProperty(propertyName)}
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 bg-slate-50 text-slate-400 rounded border border-slate-100 font-bold uppercase">
+                  Field
+                </span>
               </div>
 
-              <div className="flex items-center gap-3 w-full py-1">
+              {/* Box hiển thị giá trị */}
+              <div className="space-y-2">
                 {oldVal && (
-                  <div className="flex-[1] min-w-0 group/old">
-                    <Tooltip 
-                      title={formatValue(oldVal)} 
-                      color="#64748b"
-                      overlayInnerStyle={{ borderRadius: '8px', fontSize: '11px' }}
-                    >
-                      <div className="
-                        bg-slate-100/80 border border-slate-200/60 
-                        px-3 py-2 rounded-xl transition-all
-                        hover:bg-slate-200/50 
-                      ">
-                        <div className="text-[11px] text-slate-500 truncate font-mono font-semibold  opacity-50 italic">
-                          {formatValue(oldVal)}
-                        </div>
-                      </div>
-                    </Tooltip>
+                  <div className="relative pl-3 border-l-2 border-slate-200 py-1">
+                    <span className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-slate-200" />
+                    <div className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">Trước:</div>
+                    <div className="text-[12px] text-slate-500 font-medium  opacity-60 truncate">
+                      {formatValue(oldVal)}
+                    </div>
                   </div>
                 )}
 
-                {oldVal && <ArrowRight size={14} className="text-slate-300 shrink-0" />}
-                
-                <div className={`${oldVal ? 'flex-[1.2]' : 'w-full'} min-w-0`}>
-                  <Tooltip 
-                    title={formatValue(newVal)} 
-                    color="#2f977b" // Deep Emerald cho Tooltip (đậm hơn nền box)
-                    mouseEnterDelay={0.1}
-                    overlayInnerStyle={{ 
-                      borderRadius: '10px', 
-                      fontSize: '12px', 
-                      padding: '8px 12px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
-                      border: '1px solid rgba(16, 185, 129, 0.2)'
-                    }}
-                  >
-                    <div className="
-                      bg-[#065f46]  /* Deep Emerald - Đậm và sang trọng hơn */
-                      text-emerald-50 
-                      px-3 py-2 
-                      rounded-xl 
-                      border border-emerald-400/20 
-                      shadow-[0_4px_12px_-2px_rgba(6,95,70,0.3)]
-                      hover:bg-[#047857] /* Sáng lên một chút khi hover */
-                      hover:shadow-[0_6px_15px_-2px_rgba(6,95,70,0.4)]
-                      transition-all duration-300
-                    ">
-                      <div className="text-[12px] font-black truncate font-mono tracking-tight leading-tight">
-                        {formatValue(newVal)}
-                      </div>
+                <div className={`relative pl-3 border-l-2 ${oldVal ? 'border-blue-400' : 'border-slate-300'} py-1 bg-slate-50/50 rounded-r-lg`}>
+                  <span className={`absolute -left-[5px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full ${oldVal ? 'bg-blue-400' : 'bg-slate-300'}`} />
+                  <div className={`text-[10px] font-bold uppercase mb-0.5 ${oldVal ? 'text-blue-500' : 'text-slate-500'}`}>
+                    {oldVal ? 'Sau khi sửa:' : 'Giá trị thiết lập:'}
+                  </div>
+                  <Tooltip title={formatValue(newVal)} mouseEnterDelay={0.5}>
+                    <div className="text-[13px] text-slate-800 font-black truncate leading-tight tracking-tight">
+                      {formatValue(newVal)}
                     </div>
                   </Tooltip>
                 </div>
